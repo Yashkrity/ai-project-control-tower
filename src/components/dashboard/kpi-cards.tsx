@@ -1,4 +1,5 @@
-import { AlarmClock, CalendarClock, CheckCircle2, FolderKanban, Wallet, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { AlarmClock, Ban, CalendarClock, CheckCircle2, FolderKanban, Wallet, type LucideIcon } from "lucide-react";
 import type { PortfolioSummary } from "@/lib/metrics/portfolio";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils/format";
 
@@ -8,22 +9,33 @@ function Kpi({
   detail,
   icon: Icon,
   tone = "default",
+  href,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: LucideIcon;
   tone?: "default" | "alert";
+  /** Makes the card a link to the list behind the number. */
+  href?: string;
 }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+  const body = (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-slate-500">{label}</p>
         <Icon className={cn("size-4", tone === "alert" ? "text-red-500" : "text-slate-400")} aria-hidden />
       </div>
       <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{detail}</p>
-    </div>
+    </>
+  );
+  const box = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
+  return href ? (
+    <Link href={href} className={cn(box, "block transition-colors hover:border-indigo-300 hover:bg-indigo-50/30")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={box}>{body}</div>
   );
 }
 
@@ -33,7 +45,7 @@ export function KpiCards({ summary }: { summary: PortfolioSummary }) {
   const nextMilestone = summary.upcomingMilestones[0];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       <Kpi
         label="Active projects"
         value={String(summary.activeProjects)}
@@ -52,6 +64,15 @@ export function KpiCards({ summary }: { summary: PortfolioSummary }) {
         detail={summary.overdueTaskCount === 0 ? "Nothing past due" : "Open and past due date"}
         icon={AlarmClock}
         tone={summary.overdueTaskCount > 0 ? "alert" : "default"}
+        href="/tasks?view=overdue"
+      />
+      <Kpi
+        label="Blocked tasks"
+        value={String(summary.blockedTaskCount)}
+        detail={summary.blockedTaskCount === 0 ? "Nothing blocked" : "Marked blocked or waiting on predecessors"}
+        icon={Ban}
+        tone={summary.blockedTaskCount > 0 ? "alert" : "default"}
+        href="/tasks?view=blocked"
       />
       <Kpi
         label="Milestones (next 30 days)"

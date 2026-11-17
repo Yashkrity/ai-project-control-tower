@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Archive, ArrowLeft, CalendarX2, MessageSquareDashed, Pencil } from "lucide-react";
+import { Archive, ArrowLeft, CalendarX2, ListChecks, MessageSquareDashed, Pencil, Plus } from "lucide-react";
+import type { TaskRow } from "@/lib/tasks/views";
+import { TaskTable } from "@/components/tasks/task-table";
 import type { Milestone, ProjectUpdate } from "@/lib/types";
 import { isMilestoneDelayed, type ProjectSummary } from "@/lib/metrics/portfolio";
 import { daysBetween, formatDate, formatRelativeDays } from "@/lib/utils/dates";
@@ -35,14 +37,16 @@ export function ProjectDetail({
   summary,
   milestones,
   updates,
+  tasks,
   today,
 }: {
   summary: ProjectSummary;
   milestones: Milestone[];
   updates: ProjectUpdate[];
+  tasks: TaskRow[];
   today: string;
 }) {
-  const { project, progress, overdueTasks, scheduleElapsed, budgetBurn } = summary;
+  const { project, progress, overdueTasks, blockedTasks, scheduleElapsed, budgetBurn } = summary;
   const archived = project.archivedAt !== null;
   const archiveAction = (archived ? restoreProjectAction : archiveProjectAction).bind(null, project.id);
 
@@ -86,13 +90,19 @@ export function ProjectDetail({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Stat
           label="Progress"
           value={`${Math.round(progress.percent)}%`}
           detail={progress.total === 0 ? "No tasks yet" : `${progress.completed} of ${progress.total} tasks done`}
         />
         <Stat label="Overdue tasks" value={String(overdueTasks)} detail="Open and past due date" alert={overdueTasks > 0} />
+        <Stat
+          label="Blocked tasks"
+          value={String(blockedTasks)}
+          detail="Marked blocked or waiting on predecessors"
+          alert={blockedTasks > 0}
+        />
         <Stat label="Schedule elapsed" value={`${scheduleElapsed}%`} detail={`Target end ${formatDate(project.targetEndDate)}`} />
         <Stat
           label="Budget used"
@@ -136,7 +146,38 @@ export function ProjectDetail({
           <ActivityList updates={updates} today={today} />
         </div>
       </div>
+
+      <ProjectTasks projectId={project.id} rows={tasks} archived={archived} />
     </div>
+  );
+}
+
+function ProjectTasks({ projectId, rows, archived }: { projectId: string; rows: TaskRow[]; archived: boolean }) {
+  return (
+    <Card>
+      <CardHeader
+        title="Tasks"
+        description={rows.length ? `${rows.filter((r) => r.task.status === "done").length} of ${rows.length} done · open work first` : undefined}
+        action={
+          <div className="flex items-center gap-3">
+            <Link href={`/tasks?project=${projectId}`} className="text-sm font-medium text-slate-500 hover:text-slate-800">
+              View in Tasks
+            </Link>
+            {!archived && (
+              <LinkButton href={`/tasks/new?project=${projectId}`} variant="secondary" className="py-1.5">
+                <Plus className="size-4" aria-hidden />
+                Add task
+              </LinkButton>
+            )}
+          </div>
+        }
+      />
+      {rows.length === 0 ? (
+        <EmptyState icon={ListChecks} title="No tasks yet" description="Add tasks to track progress. Progress is calculated from them." />
+      ) : (
+        <TaskTable rows={rows} showProject={false} />
+      )}
+    </Card>
   );
 }
 

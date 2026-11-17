@@ -2,7 +2,7 @@
 
 A portfolio control tower for Technical Project Managers and PMOs running many technology projects at once. It brings project health, delivery progress, milestones, tasks, dependencies and RAID (risks, assumptions, issues, dependencies) into one workspace.
 
-> **Status: Phase 2 (Projects module).** The portfolio dashboard and full Projects CRUD (create, edit, archive, restore) work against a **local JSON data store** that persists across refreshes and restarts. Tasks, Milestones and RAID screens are placeholders for the next phases. Supabase persistence and auth are not wired up yet.
+> **Status: Phase 3 (Tasks module).** The portfolio dashboard, Projects (create, edit, archive, restore) and Tasks (CRUD, views, filters, dependencies, completion tracking) work against a **local JSON data store** that persists across refreshes and restarts. Milestones and RAID screens are placeholders for the next phases. Supabase persistence and auth are not wired up yet.
 
 ## Tech stack
 
@@ -38,7 +38,7 @@ Then open http://localhost:3000.
 | `npm run dev` | Dev server on port 3000 |
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
-| `npm test` | Unit tests: metrics, validation, local data store, activity log |
+| `npm test` | Unit and integration tests: metrics, validation, task rules and views, local data store, services |
 | `npm run data:reset` | Delete the local data file; it is re-seeded from demo data on the next request |
 | `npm run typecheck` | Generate Next route types, then `tsc --noEmit` |
 | `npm run lint` | ESLint |
@@ -69,13 +69,16 @@ src/
       page.tsx                 Portfolio dashboard ("/")
       error.tsx                Error boundary with retry
       projects/                List, new, [id] detail, [id]/edit, and actions.ts (server actions)
-      tasks/ milestones/ raid/ Placeholders for upcoming modules
+      tasks/                   List (views + filters), new, [id] detail, [id]/edit, and actions.ts
+      milestones/ raid/        Placeholders for upcoming modules
   components/
     layout/                    Sidebar (desktop + mobile drawer), page header, placeholder
     ui/                        Card, Badge, Button, FormField, ProgressBar, EmptyState, Skeleton
     dashboard/                 KPI cards, health breakdown, progress chart, tables, lists
     projects/                  Project form, detail view, list table, archive button
+    tasks/                     Task form, detail view, table, filters, delete button
   lib/
+    tasks/                     Task rules (dependencies, cycles, blocked, completion) and list views
     types.ts                   Domain model (Project, Task, Milestone, RaidItem, ProjectUpdate)
     data/                      Repository interface, local file store, demo seed data
     services/                  Use-cases (writes + activity log), called by server actions
@@ -102,7 +105,9 @@ supabase/schema.sql            Draft Postgres schema with RLS
 | --- | --- |
 | Active project | Not archived and status is not `completed` |
 | Project progress | Tasks done ÷ total tasks (equal weight); 0% when a project has no tasks |
-| Overdue task | Status ≠ `done` and due date is before today |
+| Overdue task | Status ≠ `done` and due date is before today (unchanged; on-hold tasks still count) |
+| Blocked task | Status is `blocked`, **or** status is not `done`/`on_hold`, the start date has arrived, and a predecessor is not done |
+| Due soon | Not done and due between today and today + 7 days |
 | Upcoming milestone | Not completed, planned date between today and today + 30 days |
 | Past-due milestone | Not completed and planned date is before today |
 | Delayed milestone | Past due, **or** completed after its planned date |
@@ -126,11 +131,33 @@ Archived projects are excluded everywhere. Completed projects count toward task 
 
 Progress is never typed in: it is calculated from the project's tasks. Changes to status, health, target end date and budget are written to the activity feed; cosmetic edits (such as the description) are not. Until authentication exists, the author is recorded as "Workspace user".
 
+## Tasks module
+
+| Route | Purpose |
+| --- | --- |
+| `/tasks` | Views: All, Overdue, Due soon, Blocked, Completed. Filters: project, owner, priority, status (in the URL, so views can be bookmarked) |
+| `/tasks?project=<id>` | Project-specific task view (also shown on each project's detail page) |
+| `/tasks/new` | Create a task (`?project=<id>` preselects the project) |
+| `/tasks/[id]` | Detail: predecessors, tasks waiting on it, why it is blocked, completion timing; Edit / Delete |
+| `/tasks/[id]/edit` | Edit a task |
+
+Statuses: Not started, In progress, Blocked, On hold, Done. Priorities: Critical, High, Medium, Low.
+
+Rules, all enforced on the server inside the store's write lock (the form mirrors some of them for faster feedback):
+
+- **Project and milestone.** The project must exist and not be archived. A milestone must belong to the same project.
+- **Dependencies.** Predecessors must exist, be in the same project, and not be the task itself. Circular dependencies are rejected with the full cycle named (for example “A” → “B” → “A”). A task cannot move to another project while tasks there depend on it.
+- **Done gate.** A task cannot be marked Done while a predecessor is incomplete, unless “Complete anyway” is ticked. The override is written to the project's activity log.
+- **Completion date.** Becoming Done records the submitted date, or today if blank. Staying Done keeps the stored date. Reopening clears it, and the previous date stays in the activity log. Dates in the future are rejected.
+- **Delete.** Refused while other tasks depend on the task; the dependents are named.
+
+Activity log entries: completed (with days early or late), reopened, marked blocked, completed via override, deleted.
+
 ## Roadmap
 
 1. ~~**Projects module.**~~ Done (local store).
-2. **Supabase data source.** Apply `supabase/schema.sql`, add a seed script, implement the Supabase repository, and add auth with workspace-scoped access rules.
-3. **Tasks module.** CRUD, owners, priorities, overdue filter, dependency management.
+2. ~~**Tasks module.**~~ Done (local store).
+3. **Supabase data source.** Apply `supabase/schema.sql`, add a seed script, implement the Supabase repository (with the task rules in a transaction or RPC), and add auth with workspace-scoped access rules.
 4. **Milestones module.** Planned vs actual dates, delayed detection.
 5. **RAID module.** Full RAID log with severity/probability/impact and mitigation tracking.
 6. **AI features.** For example status-report drafting and RAID suggestions, server-side via the Anthropic API.

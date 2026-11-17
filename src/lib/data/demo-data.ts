@@ -241,9 +241,9 @@ export function buildDemoData(today: ISODate): PortfolioData {
       ["t-erp-04", "ms-erp-2", "Finance data migration rehearsal", "Ravi Patel", "critical", "in_progress", -35, -6, ["t-erp-03"]],
       ["t-erp-05", "ms-erp-2", "Finance SIT defect triage", "Leah Chen", "high", "in_progress", -20, -2, ["t-erp-04"]],
       ["t-erp-06", "ms-erp-3", "Warehouse picking workflow config", "Marcus Lee", "medium", "in_progress", -15, 14],
-      ["t-erp-07", "ms-erp-3", "UAT scripts for warehouse", "Grace Kim", "medium", "todo", 0, 20, ["t-erp-06"]],
-      ["t-erp-08", "ms-erp-4", "Cutover runbook", "Ravi Patel", "high", "todo", 30, 70],
-      ["t-erp-09", "ms-erp-4", "Hypercare rota", "Priya Sharma", "low", "todo", 60, 80, ["t-erp-08"]],
+      ["t-erp-07", "ms-erp-3", "UAT scripts for warehouse", "Grace Kim", "medium", "not_started", 0, 20, ["t-erp-06"]],
+      ["t-erp-08", "ms-erp-4", "Cutover runbook", "Ravi Patel", "high", "not_started", 30, 70],
+      ["t-erp-09", "ms-erp-4", "Hypercare rota", "Priya Sharma", "low", "not_started", 60, 80, ["t-erp-08"]],
     ],
     "prj-mobile": [
       ["t-mob-01", "ms-mob-1", "Component library in Figma", "Hana Ito", "high", "done", -74, -52],
@@ -251,8 +251,8 @@ export function buildDemoData(today: ISODate): PortfolioData {
       ["t-mob-03", "ms-mob-2", "Saved baskets feature", "Tom Becker", "medium", "done", -45, -12, ["t-mob-02"]],
       ["t-mob-04", "ms-mob-2", "In-store pickup flow", "Nadia Aziz", "high", "in_progress", -25, 4],
       ["t-mob-05", "ms-mob-2", "Crash reporting & analytics", "Hana Ito", "medium", "done", -20, -5],
-      ["t-mob-06", "ms-mob-3", "Accessibility audit fixes", "Nadia Aziz", "medium", "todo", 5, 30, ["t-mob-04"]],
-      ["t-mob-07", "ms-mob-3", "App store listing & screenshots", "Hana Ito", "low", "todo", 35, 50],
+      ["t-mob-06", "ms-mob-3", "Accessibility audit fixes", "Nadia Aziz", "medium", "not_started", 5, 30, ["t-mob-04"]],
+      ["t-mob-07", "ms-mob-3", "App store listing & screenshots", "Hana Ito", "low", "not_started", 35, 50],
       ["t-mob-08", null, "Push notification consent copy", "Tom Becker", "low", "in_progress", -6, -1],
     ],
     "prj-data": [
@@ -261,30 +261,30 @@ export function buildDemoData(today: ISODate): PortfolioData {
       ["t-dat-03", "ms-dat-2", "Migrate pharmacy feed", "Elena Rossi", "high", "blocked", -60, -18, ["t-dat-02"]],
       ["t-dat-04", "ms-dat-2", "Migrate lab results stream", "Kwame Mensah", "critical", "in_progress", -50, -9, ["t-dat-02"]],
       ["t-dat-05", "ms-dat-3", "Rebuild readmission dashboards", "Ivy Nguyen", "high", "in_progress", -30, 5, ["t-dat-04"]],
-      ["t-dat-06", "ms-dat-3", "Report parity test pack", "Ivy Nguyen", "high", "todo", -10, 8, ["t-dat-05"]],
+      ["t-dat-06", "ms-dat-3", "Report parity test pack", "Ivy Nguyen", "high", "not_started", -10, 8, ["t-dat-05"]],
       ["t-dat-07", null, "Data quality rules for PHI fields", "Owen Brooks", "critical", "in_progress", -40, -3],
-      ["t-dat-08", "ms-dat-4", "Decommission plan for Hadoop cluster", "Kwame Mensah", "medium", "todo", 10, 28, ["t-dat-06"]],
+      ["t-dat-08", "ms-dat-4", "Decommission plan for Hadoop cluster", "Kwame Mensah", "medium", "not_started", 10, 28, ["t-dat-06"]],
     ],
     "prj-zt": [
       ["t-zt-01", "ms-zt-1", "Migrate SSO apps to Entra ID", "Carlos Diaz", "critical", "done", -38, -7],
       ["t-zt-02", "ms-zt-1", "Conditional access baseline", "Mei Tanaka", "high", "done", -30, -8],
       ["t-zt-03", "ms-zt-2", "Device compliance policies", "Mei Tanaka", "high", "in_progress", -6, 12, ["t-zt-02"]],
-      ["t-zt-04", "ms-zt-2", "Pilot cohort comms", "Ben Harper", "medium", "todo", 2, 14],
-      ["t-zt-05", "ms-zt-3", "Network micro-segmentation design", "Carlos Diaz", "high", "todo", 15, 60],
-      ["t-zt-06", "ms-zt-3", "Endpoint rollout waves 1-4", "Ben Harper", "medium", "todo", 45, 115, ["t-zt-03", "t-zt-05"]],
+      ["t-zt-04", "ms-zt-2", "Pilot cohort comms", "Ben Harper", "medium", "not_started", 2, 14],
+      ["t-zt-05", "ms-zt-3", "Network micro-segmentation design", "Carlos Diaz", "high", "not_started", 15, 60],
+      ["t-zt-06", "ms-zt-3", "Endpoint rollout waves 1-4", "Ben Harper", "medium", "not_started", 45, 115, ["t-zt-03", "t-zt-05"]],
     ],
     "prj-crm": [
       ["t-crm-01", "ms-crm-1", "Field mapping across 3 orgs", "Julia Weber", "high", "done", -85, -62],
       ["t-crm-02", "ms-crm-2", "Duplicate account resolution rules", "Samir Haddad", "high", "blocked", -55, -20, ["t-crm-01"]],
-      ["t-crm-03", "ms-crm-2", "Sandbox merge dry run", "Julia Weber", "critical", "todo", -25, -15, ["t-crm-02"]],
-      ["t-crm-04", "ms-crm-3", "Sales team training plan", "Aisha Rahman", "medium", "todo", 30, 60],
+      ["t-crm-03", "ms-crm-2", "Sandbox merge dry run", "Julia Weber", "critical", "not_started", -25, -15, ["t-crm-02"]],
+      ["t-crm-04", "ms-crm-3", "Sales team training plan", "Aisha Rahman", "medium", "on_hold", 30, 60],
       ["t-crm-05", null, "Licence true-up with vendor", "Samir Haddad", "low", "done", -70, -50],
     ],
     "prj-aisd": [
       ["t-ai-01", "ms-ai-1", "Collect 6 months of ticket history", "Noah Fischer", "medium", "done", -9, -3],
       ["t-ai-02", "ms-ai-1", "Define deflection KPIs", "Priya Sharma", "high", "in_progress", -5, 7],
-      ["t-ai-03", "ms-ai-1", "Security & data residency review", "Mei Tanaka", "critical", "todo", 0, 9],
-      ["t-ai-04", "ms-ai-2", "Prototype triage prompts", "Noah Fischer", "medium", "todo", 10, 40, ["t-ai-02"]],
+      ["t-ai-03", "ms-ai-1", "Security & data residency review", "Mei Tanaka", "critical", "not_started", 0, 9],
+      ["t-ai-04", "ms-ai-2", "Prototype triage prompts", "Noah Fischer", "medium", "not_started", 10, 40, ["t-ai-02"]],
     ],
     "prj-portal": [
       ["t-por-01", "ms-por-1", "Broker authentication", "Tom Becker", "critical", "done", -200, -120],
@@ -299,20 +299,38 @@ export function buildDemoData(today: ISODate): PortfolioData {
     ],
   };
 
+  /** Days between due date and actual completion for done tasks (+ = late). */
+  const completionSlip: Record<string, number> = {
+    "t-erp-02": 3,
+    "t-erp-03": 5,
+    "t-mob-01": -2,
+    "t-dat-01": 6,
+    "t-dat-02": 9,
+    "t-zt-01": -1,
+    "t-crm-01": 4,
+    "t-por-04": 2,
+  };
+
   const tasks: Task[] = Object.entries(taskSpecs).flatMap(([projectId, specs]) =>
-    specs.map(([id, milestoneId, title, owner, priority, status, start, due, dependsOn = []]) => ({
-      id,
-      projectId,
-      milestoneId,
-      title,
-      owner,
-      priority,
-      status,
-      startDate: d(start),
-      dueDate: d(due),
-      completedDate: status === "done" ? d(due) : null,
-      dependsOn,
-    })),
+    specs.map(([id, milestoneId, title, owner, priority, status, start, due, dependsOn = []]) => {
+      const completed = status === "done" ? Math.min(-1, due + (completionSlip[id] ?? 0)) : null;
+      return {
+        id,
+        projectId,
+        milestoneId,
+        title,
+        description: "",
+        owner,
+        priority,
+        status,
+        startDate: d(start),
+        dueDate: d(due),
+        completedDate: completed === null ? null : d(completed),
+        dependsOn,
+        createdAt: ts(Math.min(start, -1), 8),
+        updatedAt: ts(completed ?? Math.min(start, 0), 9),
+      };
+    }),
   );
 
   const raid = (

@@ -35,13 +35,16 @@ const task = (over: Partial<Task> = {}): Task => ({
   projectId: "p1",
   milestoneId: null,
   title: "T",
+  description: "",
   owner: "O",
   priority: "medium",
-  status: "todo",
+  status: "not_started",
   startDate: "2026-06-01",
   dueDate: "2026-06-20",
   completedDate: null,
   dependsOn: [],
+  createdAt: "2026-06-01T09:00:00.000Z",
+  updatedAt: "2026-06-01T09:00:00.000Z",
   ...over,
 });
 

@@ -42,14 +42,19 @@ create table if not exists public.tasks (
   project_id      uuid not null references public.projects(id) on delete cascade,
   milestone_id    uuid references public.milestones(id) on delete set null,
   title           text not null,
+  description     text not null default '',
   owner           text not null,
   priority        text not null default 'medium' check (priority in ('low','medium','high','critical')),
-  status          text not null default 'todo' check (status in ('todo','in_progress','blocked','done')),
+  status          text not null default 'not_started'
+                  check (status in ('not_started','in_progress','blocked','on_hold','done')),
   start_date      date not null,
   due_date        date not null,
+  -- Actual completion date: required while done, cleared when reopened.
   completed_date  date,
   created_at      timestamptz not null default now(),
-  constraint tasks_dates_valid check (due_date >= start_date)
+  updated_at      timestamptz not null default now(),
+  constraint tasks_dates_valid check (due_date >= start_date),
+  constraint tasks_completion_matches_status check ((status = 'done') = (completed_date is not null))
 );
 
 create table if not exists public.task_dependencies (
@@ -58,6 +63,12 @@ create table if not exists public.task_dependencies (
   primary key (task_id, depends_on_task_id),
   constraint no_self_dependency check (task_id <> depends_on_task_id)
 );
+-- Not yet enforced in SQL (the app enforces them in src/lib/tasks/rules.ts):
+--   * both tasks belong to the same project
+--   * no cycles
+--   * a task's milestone belongs to the task's project
+-- Add triggers or an RPC that runs those checks in one transaction when the
+-- Supabase data source is implemented.
 
 create table if not exists public.raid_items (
   id           uuid primary key default gen_random_uuid(),

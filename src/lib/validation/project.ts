@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { HEALTH_VALUES, PROJECT_STATUSES, type ProjectInput } from "@/lib/types";
+import { blankToUndefined, dateOrderError, isoDate, requiredText } from "./common";
 
 export const PROJECT_FIELDS = [
   "name",
@@ -29,17 +30,6 @@ export interface ProjectFormState {
 const MAX_MONEY = 100_000_000_000;
 const DATE_ORDER_ERROR = "Target end date cannot be before the start date";
 
-/** Empty strings and missing fields both count as "not provided". */
-const blankToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v ?? undefined);
-
-const requiredText = (label: string, min: number, max: number) =>
-  z
-    .string({ error: `${label} is required` })
-    .trim()
-    .min(1, { error: `${label} is required`, abort: true })
-    .min(min, `${label} must be at least ${min} characters`)
-    .max(max, `${label} must be ${max} characters or fewer`);
-
 const money = (label: string) =>
   z.preprocess(
     (v) => {
@@ -52,14 +42,6 @@ const money = (label: string) =>
       })
       .min(0, `${label} cannot be negative`)
       .max(MAX_MONEY, `${label} is unrealistically large`),
-  );
-
-const isoDate = (label: string) =>
-  z.preprocess(
-    blankToUndefined,
-    z.iso.date({
-      error: (issue) => (issue.input === undefined ? `${label} is required` : `${label} must be a valid date`),
-    }),
   );
 
 export const projectInputSchema = z
@@ -102,11 +84,7 @@ export function parseProjectForm(formData: FormData): ParseResult {
   if (result.success) return { success: true, data: result.data };
 
   const fieldErrors = z.flattenError(result.error).fieldErrors as ProjectFieldErrors;
-  // Zod skips object-level refinements while any field is invalid, so report
-  // the date order here too; otherwise users only see it on a second submit.
-  const start = z.iso.date().safeParse(values.startDate);
-  const end = z.iso.date().safeParse(values.targetEndDate);
-  if (start.success && end.success && end.data < start.data && !fieldErrors.targetEndDate) {
+  if (dateOrderError(values.startDate, values.targetEndDate) && !fieldErrors.targetEndDate) {
     fieldErrors.targetEndDate = [DATE_ORDER_ERROR];
   }
   return { success: false, fieldErrors, values };

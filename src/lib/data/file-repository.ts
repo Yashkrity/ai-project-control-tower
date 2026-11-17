@@ -1,11 +1,31 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ISODate, PortfolioData, Project, ProjectInput, ProjectUpdate } from "@/lib/types";
+import type { ISODate, PortfolioData, Project, ProjectInput, ProjectUpdate, Task } from "@/lib/types";
 import { buildDemoData } from "./demo-data";
-import type { NewProjectUpdate, PortfolioRepository } from "./repository";
+import type { NewProjectUpdate, PortfolioRepository, TaskBuilder, TaskDeleteGuard } from "./repository";
 
-const FILE_VERSION = 1;
+const FILE_VERSION = 2;
+
+/**
+ * v1 -> v2 (Tasks module):
+ *  - task status "todo" renamed to "not_started" ("on_hold" added)
+ *  - tasks gain description, createdAt, updatedAt
+ * Completion dates are kept as stored (v1 seeds set them to the due date).
+ */
+export function migrateStore(raw: StoreFile): StoreFile {
+  if (raw.version === FILE_VERSION) return raw;
+  if (raw.version !== 1) throw new Error(`Unsupported data file version ${raw.version}`);
+  const stamp = `${raw.seededOn}T00:00:00.000Z`;
+  const tasks = (raw.data.tasks as unknown as Array<Record<string, unknown>>).map((t) => ({
+    ...t,
+    status: t.status === "todo" ? "not_started" : t.status,
+    description: typeof t.description === "string" ? t.description : "",
+    createdAt: typeof t.createdAt === "string" ? t.createdAt : stamp,
+    updatedAt: typeof t.updatedAt === "string" ? t.updatedAt : stamp,
+  })) as unknown as Task[];
+  return { ...raw, version: FILE_VERSION, data: { ...raw.data, tasks } };
+}
 
 interface StoreFile {
   version: number;
@@ -49,7 +69,7 @@ function assertValidStore(value: unknown, filePath: string): asserts value is St
   const d = v?.data as Partial<PortfolioData> | undefined;
   const ok =
     !!v &&
-    v.version === FILE_VERSION &&
+    (v.version === 1 || v.version === FILE_VERSION) &&
     !!d &&
     ["projects", "tasks", "milestones", "raidItems", "updates"].every((k) =>
       Array.isArray((d as Record<string, unknown>)[k]),
@@ -96,6 +116,11 @@ export class FileRepository implements PortfolioRepository {
       parsed = null;
     }
     assertValidStore(parsed, this.filePath);
+    if (parsed.version !== FILE_VERSION) {
+      const migrated = migrateStore(parsed);
+      await this.save(migrated);
+      return migrated;
+    }
     return parsed;
   }
 
@@ -154,6 +179,41 @@ export class FileRepository implements PortfolioRepository {
       project.archivedAt = archived ? (project.archivedAt ?? at) : null;
       project.updatedAt = at;
       return project;
+    });
+  }
+
+  getTask(id: string): Promise<Task | null> {
+    return this.read((data) => data.tasks.find((t) => t.id === id) ?? null);
+  }
+
+  createTask(build: TaskBuilder): Promise<Task> {
+    return this.mutate((data) => {
+      const at = this.now().toISOString();
+      const task: Task = { ...build(data, null), id: randomUUID(), createdAt: at, updatedAt: at };
+      data.tasks.push(task);
+      return task;
+    });
+  }
+
+  updateTask(id: string, build: TaskBuilder): Promise<Task | null> {
+    return this.mutate((data) => {
+      const index = data.tasks.findIndex((t) => t.id === id);
+      if (index === -1) return null;
+      const existing = data.tasks[index];
+      const task: Task = { ...build(data, existing), id, createdAt: existing.createdAt, updatedAt: this.now().toISOString() };
+      data.tasks[index] = task;
+      return task;
+    });
+  }
+
+  deleteTask(id: string, guard: TaskDeleteGuard): Promise<Task | null> {
+    return this.mutate((data) => {
+      const index = data.tasks.findIndex((t) => t.id === id);
+      if (index === -1) return null;
+      const existing = data.tasks[index];
+      guard(data, existing);
+      data.tasks.splice(index, 1);
+      return existing;
     });
   }
 

@@ -20,7 +20,7 @@ export function ProjectsTable({ rows }: { rows: ProjectSummary[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {rows.map(({ project, progress, budgetBurn, overdueTasks }) => (
+          {rows.map(({ project, progress, budgetBurn, overdueTasks, blockedTasks }) => (
             <tr key={project.id} className="relative hover:bg-slate-50/70">
               <td className="px-5 py-3">
                 <Link
@@ -50,6 +50,7 @@ export function ProjectsTable({ rows }: { rows: ProjectSummary[] }) {
                 <p className="mt-1 text-[11px] text-slate-500">
                   {progress.total === 0 ? "No tasks yet" : `${progress.completed}/${progress.total} tasks`}
                   {overdueTasks > 0 && <span className="font-medium text-red-600"> · {overdueTasks} overdue</span>}
+                  {blockedTasks > 0 && <span className="font-medium text-red-600"> · {blockedTasks} blocked</span>}
                 </p>
               </td>
               <td className="px-3 py-3 text-slate-700">{formatDate(project.targetEndDate)}</td>

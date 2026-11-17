@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Health, Priority, ProjectStatus } from "@/lib/types";
+import type { Health, Priority, ProjectStatus, TaskStatus } from "@/lib/types";
 import { cn, humanize } from "@/lib/utils/format";
 
 type Tone = "neutral" | "green" | "amber" | "red" | "blue" | "violet";
@@ -50,6 +50,18 @@ const STATUS_TONE: Record<ProjectStatus, Tone> = {
 
 export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
   return <Badge tone={STATUS_TONE[status]}>{humanize(status)}</Badge>;
+}
+
+const TASK_STATUS_TONE: Record<TaskStatus, Tone> = {
+  not_started: "neutral",
+  in_progress: "blue",
+  blocked: "red",
+  on_hold: "amber",
+  done: "green",
+};
+
+export function TaskStatusBadge({ status }: { status: TaskStatus }) {
+  return <Badge tone={TASK_STATUS_TONE[status]}>{humanize(status)}</Badge>;
 }
 
 export function ArchivedBadge() {

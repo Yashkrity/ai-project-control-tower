@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getRepository, getToday } from "@/lib/data";
 import { summarizeProject } from "@/lib/metrics/portfolio";
+import { applyTaskFilters, buildTaskRows } from "@/lib/tasks/views";
 import { ProjectDetail } from "@/components/projects/project-detail";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,11 +24,14 @@ async function ProjectContent({ params }: { params: PageProps<"/projects/[id]">[
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 10);
 
+  const tasks = applyTaskFilters(buildTaskRows(data, today, { includeArchived: true }), { view: "all", project: id });
+
   return (
     <ProjectDetail
       summary={summarizeProject(project, data, today)}
       milestones={milestones}
       updates={updates}
+      tasks={tasks}
       today={today}
     />
   );

@@ -16,6 +16,7 @@ import type {
   Task,
 } from "@/lib/types";
 import { addDays, daysBetween } from "@/lib/utils/dates";
+import { indexTasks, taskBlockInfo } from "@/lib/tasks/rules";
 
 /* ------------------------------------------------------------------ */
 /* Rules                                                               */
@@ -91,6 +92,8 @@ export interface ProjectSummary {
   project: Project;
   progress: Completion;
   overdueTasks: number;
+  /** Status Blocked, or underway but waiting on incomplete predecessors. */
+  blockedTasks: number;
   delayedMilestones: number;
   openRisks: number;
   openIssues: number;
@@ -123,6 +126,7 @@ export interface PortfolioSummary {
   taskCompletion: Completion;
   overdueTaskCount: number;
   overdueTasks: OverdueTaskRow[];
+  blockedTaskCount: number;
   upcomingMilestones: MilestoneRow[];
   /** Open milestones past their planned date. */
   pastDueMilestoneCount: number;
@@ -150,10 +154,12 @@ export function summarizeProject(
 ): ProjectSummary {
   const pTasks = data.tasks.filter((t) => t.projectId === project.id);
   const pRaid = data.raidItems.filter((r) => r.projectId === project.id && isOpenRaid(r));
+  const byId = indexTasks(pTasks); // dependencies are always within one project
   return {
     project,
     progress: taskCompletion(pTasks),
     overdueTasks: pTasks.filter((t) => isTaskOverdue(t, today)).length,
+    blockedTasks: pTasks.filter((t) => taskBlockInfo(t, byId, today).blocked).length,
     delayedMilestones: data.milestones.filter(
       (m) => m.projectId === project.id && isMilestoneDelayed(m, today),
     ).length,
@@ -232,6 +238,7 @@ export function buildPortfolioSummary(
     taskCompletion: taskCompletion(tasks),
     overdueTaskCount: overdueTasks.length,
     overdueTasks,
+    blockedTaskCount: projectSummaries.reduce((sum, p) => sum + p.blockedTasks, 0),
     upcomingMilestones,
     pastDueMilestoneCount: milestones.filter((m) => isMilestonePastDue(m, today)).length,
     delayedMilestoneCount: milestones.filter((m) => isMilestoneDelayed(m, today)).length,

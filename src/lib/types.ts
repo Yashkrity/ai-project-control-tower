@@ -15,7 +15,7 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const HEALTH_VALUES = ["green", "amber", "red"] as const;
 export type Health = (typeof HEALTH_VALUES)[number];
 
-export const TASK_STATUSES = ["todo", "in_progress", "blocked", "done"] as const;
+export const TASK_STATUSES = ["not_started", "in_progress", "blocked", "on_hold", "done"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const PRIORITIES = ["low", "medium", "high", "critical"] as const;
@@ -85,15 +85,38 @@ export interface Task {
   projectId: string;
   milestoneId: string | null;
   title: string;
+  description: string;
   owner: string;
   priority: Priority;
   status: TaskStatus;
   startDate: ISODate;
   dueDate: ISODate;
+  /** Actual completion date. Set only while status is "done". */
   completedDate: ISODate | null;
-  /** IDs of tasks that must finish before this one can start. */
+  /** Predecessor task IDs (same project) that must be done first. */
   dependsOn: string[];
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
 }
+
+/** Fields a user can set when creating or editing a task. */
+export type TaskInput = Pick<
+  Task,
+  | "projectId"
+  | "milestoneId"
+  | "title"
+  | "description"
+  | "owner"
+  | "priority"
+  | "status"
+  | "startDate"
+  | "dueDate"
+  | "completedDate"
+  | "dependsOn"
+>;
+
+/** A task as stored, minus the fields the repository assigns. */
+export type TaskDraft = Omit<Task, "id" | "createdAt" | "updatedAt">;
 
 export interface RaidItem {
   id: string;
