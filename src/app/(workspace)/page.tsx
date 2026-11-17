@@ -22,7 +22,7 @@ const MILESTONE_HORIZON_DAYS = 30;
 
 async function DashboardContent() {
   const today = await getToday();
-  const repo = await getRepository(today);
+  const repo = await getRepository();
   const data = await repo.getPortfolio();
   const summary = buildPortfolioSummary(data, today, {
     milestoneHorizonDays: MILESTONE_HORIZON_DAYS,
@@ -41,9 +41,9 @@ async function DashboardContent() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-slate-500">
-        Figures calculated from live project, task and milestone records as of{" "}
+        Figures calculated from saved project, task and milestone records as of{" "}
         <span className="font-medium text-slate-700">{formatDate(summary.today)}</span>
-        {repo.source === "demo" && " · demo data"}
+        {repo.source === "local" && " · local data store"} · archived projects excluded
       </p>
 
       <KpiCards summary={summary} />

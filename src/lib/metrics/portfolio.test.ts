@@ -24,6 +24,8 @@ const project = (over: Partial<Project> = {}): Project => ({
   actualSpend: 250,
   status: "active",
   health: "green",
+  archivedAt: null,
+  createdAt: "2026-06-01T09:00:00.000Z",
   updatedAt: "2026-06-14T09:00:00.000Z",
   ...over,
 });
@@ -103,7 +105,7 @@ describe("buildPortfolioSummary", () => {
       project(),
       project({ id: "p2", name: "P2", health: "red" }),
       project({ id: "p3", name: "P3", status: "completed" }),
-      project({ id: "p4", name: "P4", status: "archived", health: "red" }),
+      project({ id: "p4", name: "P4", archivedAt: "2026-06-02T09:00:00.000Z", health: "red" }),
     ],
     tasks: [
       task({ id: "a", status: "done" }),
@@ -128,6 +130,9 @@ describe("buildPortfolioSummary", () => {
     expect(s.activeProjects).toBe(2);
     expect(s.healthCounts).toEqual({ green: 1, amber: 0, red: 1 });
   });
+  it("leaves archived projects out of the project table", () => {
+    expect(s.projects.map((p) => p.project.id)).toEqual(["p1", "p2", "p3"]);
+  });
   it("excludes archived projects from task metrics", () => {
     expect(s.taskCompletion).toEqual({ completed: 2, total: 4, percent: 50 });
     expect(s.overdueTaskCount).toBe(2);
@@ -148,7 +153,8 @@ describe("buildPortfolioSummary", () => {
 describe("demo data", () => {
   it("has at least five non-archived projects and consistent references", () => {
     const d = buildDemoData(TODAY);
-    expect(d.projects.filter((p) => p.status !== "archived").length).toBeGreaterThanOrEqual(5);
+    expect(d.projects.filter((p) => p.archivedAt === null).length).toBeGreaterThanOrEqual(5);
+    expect(d.projects.some((p) => p.archivedAt !== null)).toBe(true);
     const projectIds = new Set(d.projects.map((p) => p.id));
     const taskIds = new Set(d.tasks.map((t) => t.id));
     const milestoneIds = new Set(d.milestones.map((m) => m.id));

@@ -21,9 +21,13 @@ import { addDays, daysBetween } from "@/lib/utils/dates";
 /* Rules                                                               */
 /* ------------------------------------------------------------------ */
 
+export function isArchived(project: Project): boolean {
+  return project.archivedAt !== null;
+}
+
 /** A project counts as "active" until it is completed or archived. */
 export function isActiveProject(project: Project): boolean {
-  return project.status !== "completed" && project.status !== "archived";
+  return !isArchived(project) && project.status !== "completed";
 }
 
 /** Overdue = not done and the due date is strictly before today. */
@@ -138,6 +142,28 @@ export interface SummaryOptions {
 
 const PRIORITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 } as const;
 
+/** Derived metrics for a single project (works for archived projects too). */
+export function summarizeProject(
+  project: Project,
+  data: Pick<PortfolioData, "tasks" | "milestones" | "raidItems">,
+  today: ISODate,
+): ProjectSummary {
+  const pTasks = data.tasks.filter((t) => t.projectId === project.id);
+  const pRaid = data.raidItems.filter((r) => r.projectId === project.id && isOpenRaid(r));
+  return {
+    project,
+    progress: taskCompletion(pTasks),
+    overdueTasks: pTasks.filter((t) => isTaskOverdue(t, today)).length,
+    delayedMilestones: data.milestones.filter(
+      (m) => m.projectId === project.id && isMilestoneDelayed(m, today),
+    ).length,
+    openRisks: pRaid.filter((r) => r.type === "risk").length,
+    openIssues: pRaid.filter((r) => r.type === "issue").length,
+    scheduleElapsed: scheduleElapsedPercent(project, today),
+    budgetBurn: budgetBurnPercent(project),
+  };
+}
+
 /**
  * Builds the portfolio dashboard summary.
  * Scope: archived projects are excluded entirely; completed projects count
@@ -148,13 +174,12 @@ export function buildPortfolioSummary(
   today: ISODate,
   { milestoneHorizonDays = 30, recentUpdateLimit = 8 }: SummaryOptions = {},
 ): PortfolioSummary {
-  const projects = data.projects.filter((p) => p.status !== "archived");
+  const projects = data.projects.filter((p) => !isArchived(p));
   const projectIds = new Set(projects.map((p) => p.id));
   const nameOf = new Map(projects.map((p) => [p.id, p.name]));
 
   const tasks = data.tasks.filter((t) => projectIds.has(t.projectId));
   const milestones = data.milestones.filter((m) => projectIds.has(m.projectId));
-  const raid = data.raidItems.filter((r) => projectIds.has(r.projectId));
 
   const active = projects.filter(isActiveProject);
   const healthCounts: Record<Health, number> = { green: 0, amber: 0, red: 0 };
@@ -189,22 +214,9 @@ export function buildPortfolioSummary(
     }))
     .sort((a, b) => a.daysUntil - b.daysUntil);
 
-  const projectSummaries: ProjectSummary[] = projects.map((project) => {
-    const pTasks = tasks.filter((t) => t.projectId === project.id);
-    const pRaid = raid.filter((r) => r.projectId === project.id && isOpenRaid(r));
-    return {
-      project,
-      progress: taskCompletion(pTasks),
-      overdueTasks: pTasks.filter((t) => isTaskOverdue(t, today)).length,
-      delayedMilestones: milestones.filter(
-        (m) => m.projectId === project.id && isMilestoneDelayed(m, today),
-      ).length,
-      openRisks: pRaid.filter((r) => r.type === "risk").length,
-      openIssues: pRaid.filter((r) => r.type === "issue").length,
-      scheduleElapsed: scheduleElapsedPercent(project, today),
-      budgetBurn: budgetBurnPercent(project),
-    };
-  });
+  const projectSummaries = projects.map((project) =>
+    summarizeProject(project, { tasks, milestones, raidItems: data.raidItems }, today),
+  );
 
   const recentUpdates: UpdateRow[] = data.updates
     .filter((u) => projectIds.has(u.projectId))

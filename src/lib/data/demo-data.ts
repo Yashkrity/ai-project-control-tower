@@ -44,14 +44,22 @@ export function buildDemoData(today: ISODate): PortfolioData {
     `${d(offset)}T${String(hour).padStart(2, "0")}:00:00.000Z`;
 
   const project = (
-    p: Omit<Project, "startDate" | "targetEndDate" | "updatedAt"> & {
+    p: Omit<Project, "startDate" | "targetEndDate" | "updatedAt" | "createdAt" | "archivedAt"> & {
       start: number;
       end: number;
       updated: number;
+      archived?: number;
     },
   ): Project => {
-    const { start, end, updated, ...rest } = p;
-    return { ...rest, startDate: d(start), targetEndDate: d(end), updatedAt: ts(updated, 9) };
+    const { start, end, updated, archived, ...rest } = p;
+    return {
+      ...rest,
+      startDate: d(start),
+      targetEndDate: d(end),
+      createdAt: ts(start, 8),
+      updatedAt: ts(updated, 9),
+      archivedAt: archived === undefined ? null : ts(archived, 17),
+    };
   };
 
   const projects: Project[] = [
@@ -158,6 +166,21 @@ export function buildDemoData(today: ISODate): PortfolioData {
       status: "completed",
       health: "green",
       updated: -18,
+    }),
+    project({
+      id: "prj-intranet",
+      name: "Intranet Refresh",
+      client: "Northwind Logistics",
+      description: "Replaced the legacy SharePoint intranet with a modern employee hub.",
+      projectManager: "Aisha Rahman",
+      start: -400,
+      end: -240,
+      budget: 120_000,
+      actualSpend: 131_500,
+      status: "completed",
+      health: "amber",
+      updated: -200,
+      archived: -200,
     }),
   ];
 
@@ -269,6 +292,10 @@ export function buildDemoData(today: ISODate): PortfolioData {
       ["t-por-03", "ms-por-2", "Commission statements module", "Tom Becker", "high", "done", -90, -40],
       ["t-por-04", "ms-por-2", "Load testing", "Hana Ito", "medium", "done", -45, -28],
       ["t-por-05", "ms-por-2", "Go-live support", "Daniel Okafor", "medium", "done", -25, -21],
+    ],
+    "prj-intranet": [
+      ["t-int-01", null, "Content migration", "Grace Kim", "medium", "done", -380, -280],
+      ["t-int-02", null, "Launch communications", "Aisha Rahman", "low", "done", -260, -245],
     ],
   };
 

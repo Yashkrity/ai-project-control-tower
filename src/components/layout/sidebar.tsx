@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Menu, RadioTower, X } from "lucide-react";
 import { NAV_ITEMS, isNavActive } from "@/lib/config/navigation";
 import { cn } from "@/lib/utils/format";
@@ -21,15 +21,31 @@ function Brand() {
   );
 }
 
+/**
+ * The active pathname is runtime data, so the links render inside Suspense.
+ * The fallback is the same nav without an active highlight, which keeps
+ * navigation usable in the prerendered shell.
+ */
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
+  return (
+    <Suspense fallback={<NavLinksView pathname={null} onNavigate={onNavigate} />}>
+      <ActiveNavLinks onNavigate={onNavigate} />
+    </Suspense>
+  );
+}
+
+function ActiveNavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  return <NavLinksView pathname={usePathname()} onNavigate={onNavigate} />;
+}
+
+function NavLinksView({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
   return (
     <nav aria-label="Main" className="mt-8 flex flex-col gap-1">
       <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
         Workspace
       </p>
       {NAV_ITEMS.map((item) => {
-        const active = isNavActive(pathname, item.href);
+        const active = pathname !== null && isNavActive(pathname, item.href);
         const Icon = item.icon;
         return (
           <Link
@@ -56,8 +72,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 function SidebarFooter() {
   return (
     <div className="mt-auto rounded-md border border-slate-800 bg-slate-800/40 p-3 text-xs text-slate-400">
-      <p className="font-medium text-slate-200">Demo workspace</p>
-      <p className="mt-1">Data is generated in-memory. Connect Supabase to persist changes.</p>
+      <p className="font-medium text-slate-200">Local workspace</p>
+      <p className="mt-1">Changes are saved to a file on this machine. Cloud storage (Supabase) comes next.</p>
     </div>
   );
 }

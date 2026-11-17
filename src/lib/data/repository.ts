@@ -1,14 +1,23 @@
-import type { PortfolioData } from "@/lib/types";
+import type { PortfolioData, Project, ProjectInput, ProjectUpdate } from "@/lib/types";
+
+export type NewProjectUpdate = Omit<ProjectUpdate, "id" | "createdAt">;
 
 /**
- * The only way pages and components read data. Implementations:
- *  - DemoRepository: in-memory, seeded demo portfolio (default)
- *  - Supabase repository: planned for the next phase
+ * The only way pages, services and actions touch data. Implementations:
+ *  - FileRepository: JSON file on local disk, seeded from the demo portfolio
+ *  - Supabase repository: planned
  *
- * Write methods (create/update/archive) will be added per module as the
- * Projects, Tasks, Milestones and RAID modules are built.
+ * Mutations return `null` when the target record does not exist.
  */
 export interface PortfolioRepository {
-  readonly source: "demo" | "supabase";
+  readonly source: "local" | "supabase";
+
   getPortfolio(): Promise<PortfolioData>;
+  getProject(id: string): Promise<Project | null>;
+
+  createProject(input: ProjectInput): Promise<Project>;
+  updateProject(id: string, input: ProjectInput): Promise<Project | null>;
+  setProjectArchived(id: string, archived: boolean): Promise<Project | null>;
+
+  addProjectUpdate(update: NewProjectUpdate): Promise<ProjectUpdate>;
 }

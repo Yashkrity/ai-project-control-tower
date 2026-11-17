@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FolderKanban } from "lucide-react";
 import type { ProjectSummary } from "@/lib/metrics/portfolio";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -32,9 +33,14 @@ export function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {projects.map(({ project, progress, overdueTasks, openRisks, openIssues, scheduleElapsed, budgetBurn }) => (
-                <tr key={project.id} className="align-middle hover:bg-slate-50/60">
+                <tr key={project.id} className="relative align-middle hover:bg-slate-50/60">
                   <td className="px-5 py-3">
-                    <p className="font-medium text-slate-900">{project.name}</p>
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="font-medium text-slate-900 after:absolute after:inset-0 hover:text-indigo-700"
+                    >
+                      {project.name}
+                    </Link>
                     <p className="text-xs text-slate-500">
                       {project.client} · {project.projectManager} · due {formatDate(project.targetEndDate)}
                     </p>

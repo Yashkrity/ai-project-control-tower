@@ -46,11 +46,14 @@ const STATUS_TONE: Record<ProjectStatus, Tone> = {
   active: "blue",
   on_hold: "amber",
   completed: "green",
-  archived: "neutral",
 };
 
 export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
   return <Badge tone={STATUS_TONE[status]}>{humanize(status)}</Badge>;
+}
+
+export function ArchivedBadge() {
+  return <Badge tone="neutral">Archived</Badge>;
 }
 
 const PRIORITY_TONE: Record<Priority, Tone> = {

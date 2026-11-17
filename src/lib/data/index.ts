@@ -1,8 +1,9 @@
 import "server-only";
 
+import path from "node:path";
 import { connection } from "next/server";
 import { todayISO } from "@/lib/utils/dates";
-import { DemoRepository } from "./demo-repository";
+import { FileRepository } from "./file-repository";
 import type { PortfolioRepository } from "./repository";
 
 export type { PortfolioRepository } from "./repository";
@@ -21,23 +22,36 @@ export async function getToday(): Promise<string> {
   return todayISO(getAppTimeZone());
 }
 
+let warnedLegacySource = false;
+
+/** Fixed location; a static subfolder keeps server output tracing scoped. */
+function dataFilePath(): string {
+  return path.join(process.cwd(), ".data", "portfolio.json");
+}
+
 /**
- * Returns the configured data source. Pass the request's `today` (from
- * getToday) so every figure in one render uses the same date. Server-only: data access and any
- * credentials never reach the browser bundle.
+ * Returns the configured data source. Server-only: data access and any
+ * credentials never reach the browser bundle. Calls `connection()` so data
+ * is always read at request time.
  */
-export async function getRepository(today: string): Promise<PortfolioRepository> {
+export async function getRepository(): Promise<PortfolioRepository> {
   await connection();
-  const source = process.env.DATA_SOURCE || "demo";
+  const source = process.env.DATA_SOURCE || "local";
 
   switch (source) {
-    case "demo":
-      return new DemoRepository(today);
+    case "demo": // legacy value from the Phase 1 .env.example
+      if (!warnedLegacySource) {
+        warnedLegacySource = true;
+        console.warn('DATA_SOURCE=demo is deprecated; use DATA_SOURCE=local. Treating it as "local".');
+      }
+    // falls through
+    case "local":
+      return new FileRepository(dataFilePath(), todayISO(getAppTimeZone()));
     case "supabase":
       throw new Error(
-        "DATA_SOURCE=supabase is not implemented yet. Set DATA_SOURCE=demo (or remove it) in .env.local.",
+        "DATA_SOURCE=supabase is not implemented yet. Set DATA_SOURCE=local (or remove it) in .env.local.",
       );
     default:
-      throw new Error(`Unknown DATA_SOURCE "${source}". Expected "demo" or "supabase".`);
+      throw new Error(`Unknown DATA_SOURCE "${source}". Expected "local" or "supabase".`);
   }
 }

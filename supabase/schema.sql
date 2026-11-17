@@ -17,8 +17,10 @@ create table if not exists public.projects (
   budget           numeric(14,2) not null default 0 check (budget >= 0),
   actual_spend     numeric(14,2) not null default 0 check (actual_spend >= 0),
   status           text not null default 'planning'
-                   check (status in ('planning','active','on_hold','completed','archived')),
+                   check (status in ('planning','active','on_hold','completed')),
   health           text not null default 'green' check (health in ('green','amber','red')),
+  -- Archiving is independent of status so a restore returns the project unchanged.
+  archived_at      timestamptz,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
   constraint projects_dates_valid check (target_end_date >= start_date)

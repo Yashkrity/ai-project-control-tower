@@ -9,7 +9,7 @@
 export type ISODate = string;
 export type ISODateTime = string;
 
-export const PROJECT_STATUSES = ["planning", "active", "on_hold", "completed", "archived"] as const;
+export const PROJECT_STATUSES = ["planning", "active", "on_hold", "completed"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 export const HEALTH_VALUES = ["green", "amber", "red"] as const;
@@ -47,8 +47,29 @@ export interface Project {
   status: ProjectStatus;
   /** RAG health as judged by the project manager. */
   health: Health;
+  /**
+   * Archiving is independent of status, so restoring a project brings it
+   * back exactly as it was (e.g. still "completed").
+   */
+  archivedAt: ISODateTime | null;
+  createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }
+
+/** Fields a user can set when creating or editing a project. */
+export type ProjectInput = Pick<
+  Project,
+  | "name"
+  | "client"
+  | "description"
+  | "projectManager"
+  | "startDate"
+  | "targetEndDate"
+  | "budget"
+  | "actualSpend"
+  | "status"
+  | "health"
+>;
 
 export interface Milestone {
   id: string;
