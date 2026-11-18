@@ -5,6 +5,8 @@ import type {
   Project,
   ProjectInput,
   ProjectUpdate,
+  RaidDraft,
+  RaidItem,
   Task,
   TaskDraft,
 } from "@/lib/types";
@@ -30,6 +32,9 @@ export type MilestoneDeletePlan = (data: PortfolioData, existing: Milestone) => 
 
 /** Validates a bulk link/unlink in the write lock; throw to refuse. */
 export type TaskLinkGuard = (data: PortfolioData, tasks: Task[]) => void;
+
+/** Builds a RAID record to store; runs in the write lock. Throw to abort. */
+export type RaidBuilder = (data: PortfolioData, existing: RaidItem | null) => RaidDraft;
 
 /**
  * The only way pages, services and actions touch data. Implementations:
@@ -63,4 +68,15 @@ export interface PortfolioRepository {
   deleteMilestone(id: string, plan: MilestoneDeletePlan): Promise<{ milestone: Milestone; movedTasks: Task[] } | null>;
   /** Sets milestoneId on several tasks in one write. Returns the updated tasks. */
   setTasksMilestone(taskIds: string[], milestoneId: string | null, guard: TaskLinkGuard): Promise<Task[]>;
+
+  getRaidItem(id: string): Promise<RaidItem | null>;
+  /** Assigns the ID and the next per-type reference (R-001, A-001, ...). */
+  createRaidItem(build: RaidBuilder): Promise<RaidItem>;
+  updateRaidItem(id: string, build: RaidBuilder): Promise<RaidItem | null>;
+  deleteRaidItem(id: string): Promise<RaidItem | null>;
 }
+
+/*
+ * Referential integrity: deleting a task or milestone clears RAID references
+ * to it in the same write (SQL equivalent: ON DELETE SET NULL).
+ */

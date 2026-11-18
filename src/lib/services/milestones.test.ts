@@ -200,6 +200,6 @@ describe("store migration to v3", () => {
     expect(a).toMatchObject({ actualDate: "2026-06-02", owner: "Pat PM", priority: "medium", plannedStartDate: "2026-05-20", description: "", notes: "" });
     expect(a).not.toHaveProperty("status");
     expect(b).toMatchObject({ actualDate: null, plannedStartDate: "2026-07-01" });
-    expect(JSON.parse(await readFile(file, "utf8")).version).toBe(3);
+    expect(JSON.parse(await readFile(file, "utf8")).version).toBe(4); // v2 upgrades through v3 to the current version
   });
 });

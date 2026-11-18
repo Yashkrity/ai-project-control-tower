@@ -1,19 +1,21 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ISODate, Milestone, PortfolioData, Project, ProjectInput, ProjectUpdate, Task } from "@/lib/types";
+import type { ISODate, Milestone, PortfolioData, Project, ProjectInput, ProjectUpdate, RaidItem, Task } from "@/lib/types";
+import { nextRaidRef } from "@/lib/raid/refs";
 import { buildDemoData } from "./demo-data";
 import type {
   MilestoneBuilder,
   MilestoneDeletePlan,
   NewProjectUpdate,
   PortfolioRepository,
+  RaidBuilder,
   TaskBuilder,
   TaskDeleteGuard,
   TaskLinkGuard,
 } from "./repository";
 
-const FILE_VERSION = 3;
+const FILE_VERSION = 4;
 
 type Loose = Record<string, unknown>;
 const str = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
@@ -66,11 +68,59 @@ function migrateV2toV3(raw: StoreFile): StoreFile {
   return { ...raw, version: 3, data: { ...raw.data, milestones } };
 }
 
+/**
+ * v3 -> v4 (RAID module): flat RAID items become typed records.
+ *  - 3-level ratings (low/medium/high) map to 1-5 risk ratings 2/3/4 and to priorities
+ *  - generic statuses map per type (open/monitoring/resolved/closed)
+ *  - new fields get empty defaults; references (R-001 ...) are assigned per type
+ *  - closed records get the seed date as resolution date (the old model had none)
+ */
+function migrateV3toV4(raw: StoreFile): StoreFile {
+  const stamp = `${raw.seededOn}T00:00:00.000Z`;
+  const rating = (v: unknown) => (v === "high" ? 4 : v === "low" ? 2 : 3) as 2 | 3 | 4;
+  const priority = (v: unknown) => (v === "high" || v === "low" ? v : "medium") as "low" | "medium" | "high";
+  const counters: Record<string, number> = {};
+  const raidItems = (raw.data.raidItems as unknown as Loose[]).map((r) => {
+    const type = String(r.type) as RaidItem["type"];
+    counters[type] = (counters[type] ?? 0) + 1;
+    const status = String(r.status);
+    const closed = status === "resolved" || status === "closed";
+    const base = {
+      id: String(r.id),
+      ref: `${{ risk: "R", assumption: "A", issue: "I", dependency: "D" }[type]}-${String(counters[type]).padStart(3, "0")}`,
+      projectId: String(r.projectId),
+      title: str(r.title, "Untitled"),
+      description: str(r.description, ""),
+      owner: str(r.owner, "Unassigned"),
+      targetDate: typeof r.targetDate === "string" ? r.targetDate : null,
+      resolvedDate: closed ? raw.seededOn : null,
+      milestoneId: null,
+      taskId: null,
+      plan: str(r.mitigation, ""),
+      latestUpdate: "",
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    switch (type) {
+      case "risk":
+        return { ...base, type, status: closed ? "closed" : status === "monitoring" ? "mitigating" : "open", probability: rating(r.probability), impact: rating(r.impact), contingency: "" };
+      case "assumption":
+        return { ...base, type, status: closed ? "validated" : "pending", priority: priority(r.severity), validationNotes: closed ? "Validated before the RAID register upgrade." : "" };
+      case "issue":
+        return { ...base, type, status: status === "monitoring" ? "investigating" : status, priority: priority(r.severity), businessImpact: "", escalationReason: "", escalatedDate: null };
+      default:
+        return { ...base, type: "dependency", status: closed ? "fulfilled" : status === "monitoring" ? "in_progress" : "pending", priority: priority(r.severity), direction: "external", requiredFrom: "Not specified", impactIfUnfulfilled: "", escalationOwner: "" };
+    }
+  }) as unknown as RaidItem[];
+  return { ...raw, version: 4, data: { ...raw.data, raidItems } };
+}
+
 /** Upgrades a store of any supported version to the current one, step by step. */
 export function migrateStore(raw: StoreFile): StoreFile {
   let store = raw;
   if (store.version === 1) store = migrateV1toV2(store);
   if (store.version === 2) store = migrateV2toV3(store);
+  if (store.version === 3) store = migrateV3toV4(store);
   if (store.version !== FILE_VERSION) throw new Error(`Unsupported data file version ${raw.version}`);
   return store;
 }
@@ -79,6 +129,13 @@ interface StoreFile {
   version: number;
   seededOn: ISODate;
   data: PortfolioData;
+}
+
+/** ON DELETE SET NULL for RAID links to a deleted task or milestone. */
+function clearRaidReferences(data: PortfolioData, field: "taskId" | "milestoneId", id: string, at: string) {
+  data.raidItems.forEach((r, i) => {
+    if (r[field] === id) data.raidItems[i] = { ...r, [field]: null, updatedAt: at };
+  });
 }
 
 /** One queue per file: every read and write runs strictly in order. */
@@ -261,6 +318,7 @@ export class FileRepository implements PortfolioRepository {
       const existing = data.tasks[index];
       guard(data, existing);
       data.tasks.splice(index, 1);
+      clearRaidReferences(data, "taskId", id, this.now().toISOString());
       return existing;
     });
   }
@@ -308,6 +366,7 @@ export class FileRepository implements PortfolioRepository {
         movedTasks.push(data.tasks[i]);
       });
       data.milestones.splice(index, 1);
+      clearRaidReferences(data, "milestoneId", id, at);
       return { milestone, movedTasks };
     });
   }
@@ -325,6 +384,40 @@ export class FileRepository implements PortfolioRepository {
         updated.push(data.tasks[i]);
       });
       return updated;
+    });
+  }
+
+  getRaidItem(id: string): Promise<RaidItem | null> {
+    return this.read((data) => data.raidItems.find((r) => r.id === id) ?? null);
+  }
+
+  createRaidItem(build: RaidBuilder): Promise<RaidItem> {
+    return this.mutate((data) => {
+      const draft = build(data, null);
+      const at = this.now().toISOString();
+      const item = { ...draft, id: randomUUID(), ref: nextRaidRef(draft.type, data.raidItems), createdAt: at, updatedAt: at } as RaidItem;
+      data.raidItems.push(item);
+      return item;
+    });
+  }
+
+  updateRaidItem(id: string, build: RaidBuilder): Promise<RaidItem | null> {
+    return this.mutate((data) => {
+      const index = data.raidItems.findIndex((r) => r.id === id);
+      if (index === -1) return null;
+      const existing = data.raidItems[index];
+      const item = { ...build(data, existing), id, ref: existing.ref, createdAt: existing.createdAt, updatedAt: this.now().toISOString() } as RaidItem;
+      data.raidItems[index] = item;
+      return item;
+    });
+  }
+
+  deleteRaidItem(id: string): Promise<RaidItem | null> {
+    return this.mutate((data) => {
+      const index = data.raidItems.findIndex((r) => r.id === id);
+      if (index === -1) return null;
+      const [removed] = data.raidItems.splice(index, 1);
+      return removed;
     });
   }
 

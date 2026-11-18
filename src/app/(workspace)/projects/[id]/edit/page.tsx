@@ -19,6 +19,7 @@ async function EditForm({ params }: { params: PageProps<"/projects/[id]/edit">["
     <div className="space-y-6">
       <PageHeader title={`Edit ${project.name}`} description="Changes to status, health, target date and budget are logged to the activity feed." />
       <ProjectForm
+        key={project.updatedAt}
         action={updateProjectAction.bind(null, project.id)}
         initialValues={projectToFormValues(project)}
         submitLabel="Save changes"

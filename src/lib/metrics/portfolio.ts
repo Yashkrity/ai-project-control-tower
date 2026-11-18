@@ -12,12 +12,12 @@ import type {
   PortfolioData,
   Project,
   ProjectUpdate,
-  RaidItem,
   Task,
 } from "@/lib/types";
 import { daysBetween } from "@/lib/utils/dates";
 import { indexTasks, taskBlockInfo } from "@/lib/tasks/rules";
 import { isUpcoming, milestoneState, milestoneStates, type MilestoneState } from "@/lib/milestones/rules";
+import { projectRaidSummary, type RaidSummary } from "@/lib/raid/summary";
 
 /* ------------------------------------------------------------------ */
 /* Rules                                                               */
@@ -73,10 +73,6 @@ export function budgetBurnPercent(project: Project): number {
   return Math.round((project.actualSpend / project.budget) * 100);
 }
 
-function isOpenRaid(item: RaidItem): boolean {
-  return item.status === "open" || item.status === "monitoring";
-}
-
 /* ------------------------------------------------------------------ */
 /* Portfolio summary                                                   */
 /* ------------------------------------------------------------------ */
@@ -88,8 +84,8 @@ export interface ProjectSummary {
   /** Status Blocked, or underway but waiting on incomplete predecessors. */
   blockedTasks: number;
   milestones: { total: number; completed: number; delayed: number; atRisk: number };
-  openRisks: number;
-  openIssues: number;
+  /** Deterministic RAID summary (see src/lib/raid/summary.ts). */
+  raid: RaidSummary;
   scheduleElapsed: number;
   budgetBurn: number;
 }
@@ -147,7 +143,6 @@ export function summarizeProject(
   today: ISODate,
 ): ProjectSummary {
   const pTasks = data.tasks.filter((t) => t.projectId === project.id);
-  const pRaid = data.raidItems.filter((r) => r.projectId === project.id && isOpenRaid(r));
   const byId = indexTasks(pTasks); // dependencies are always within one project
   const states = data.milestones
     .filter((m) => m.projectId === project.id)
@@ -163,8 +158,7 @@ export function summarizeProject(
       delayed: states.filter((s) => s === "delayed").length,
       atRisk: states.filter((s) => s === "at_risk").length,
     },
-    openRisks: pRaid.filter((r) => r.type === "risk").length,
-    openIssues: pRaid.filter((r) => r.type === "issue").length,
+    raid: projectRaidSummary(project.id, data, today),
     scheduleElapsed: scheduleElapsedPercent(project, today),
     budgetBurn: budgetBurnPercent(project),
   };

@@ -18,6 +18,8 @@ async function NewMilestoneForm({ searchParams }: { searchParams: PageProps<"/mi
 
   return (
     <MilestoneForm
+      // Remount when ?project changes, so client state starts fresh.
+      key={chosen?.id ?? ""}
       action={createMilestoneAction}
       initialValues={{ projectId: chosen?.id ?? "", owner: chosen?.projectManager ?? "", priority: "medium" }}
       submitLabel="Create milestone"

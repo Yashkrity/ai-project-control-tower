@@ -24,6 +24,7 @@ async function EditMilestoneForm({ params }: { params: PageProps<"/milestones/[i
     <div className="space-y-6">
       <PageHeader title={`Edit “${milestone.name}”`} description="Changes to planned dates and completion are recorded in the project's activity log." />
       <MilestoneForm
+        key={milestone.updatedAt}
         action={updateMilestoneAction.bind(null, milestone.id)}
         initialValues={milestoneToFormValues(milestone)}
         submitLabel="Save changes"

@@ -13,6 +13,7 @@ const KIND_TONE: Record<UpdateKind, "neutral" | "blue" | "amber" | "violet" | "g
   risk: "amber",
   decision: "violet",
   general: "neutral",
+  raid: "amber",
 };
 
 export function RecentUpdates({ rows, today }: { rows: UpdateRow[]; today: string }) {

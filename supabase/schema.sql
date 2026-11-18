@@ -81,29 +81,65 @@ create table if not exists public.task_dependencies (
 -- Add triggers or an RPC that runs those checks in one transaction when the
 -- Supabase data source is implemented.
 
+-- RAID register: one table, shared columns plus nullable type-specific columns
+-- guarded by CHECK constraints. Risk score/level, overdue and escalation flags
+-- are calculated in the app (src/lib/raid/rules.ts), not stored.
+-- target_date is the type's deadline: risk review date, assumption validation
+-- deadline, issue target resolution date, dependency required-by date.
 create table if not exists public.raid_items (
-  id           uuid primary key default gen_random_uuid(),
-  project_id   uuid not null references public.projects(id) on delete cascade,
-  type         text not null check (type in ('risk','assumption','issue','dependency')),
-  title        text not null,
-  description  text not null default '',
-  owner        text not null,
-  severity     text not null check (severity in ('low','medium','high')),
-  probability  text not null check (probability in ('low','medium','high')),
-  impact       text not null check (impact in ('low','medium','high')),
-  mitigation   text not null default '',
-  status       text not null default 'open' check (status in ('open','monitoring','resolved','closed')),
-  target_date  date,
-  created_at   timestamptz not null default now()
+  id                     uuid primary key default gen_random_uuid(),
+  ref                    text not null,               -- R-001, A-001, I-001, D-001
+  project_id             uuid not null references public.projects(id) on delete cascade,
+  type                   text not null check (type in ('risk','assumption','issue','dependency')),
+  title                  text not null,
+  description            text not null default '',    -- assumption statement for assumptions
+  owner                  text not null,
+  status                 text not null,
+  target_date            date,
+  resolved_date          date,                        -- set when the record reaches a closed state
+  milestone_id           uuid references public.milestones(id) on delete set null,
+  task_id                uuid references public.tasks(id) on delete set null,
+  plan                   text not null default '',
+  latest_update          text not null default '',
+  -- risk
+  probability            smallint check (probability between 1 and 5),
+  impact                 smallint check (impact between 1 and 5),
+  contingency            text,
+  -- assumption, issue, dependency
+  priority               text check (priority in ('low','medium','high','critical')),
+  validation_notes       text,                        -- assumption
+  business_impact        text,                        -- issue
+  escalation_reason      text,                        -- issue
+  escalated_date         date,                        -- issue
+  direction              text check (direction in ('internal','external')),  -- dependency
+  required_from          text,                        -- dependency
+  impact_if_unfulfilled  text,                        -- dependency
+  escalation_owner       text,                        -- dependency
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now(),
+  unique (ref),
+  constraint raid_status_by_type check (
+    (type = 'risk'       and status in ('open','mitigating','closed','materialized')) or
+    (type = 'assumption' and status in ('pending','validated','invalidated')) or
+    (type = 'issue'      and status in ('open','investigating','escalated','resolved','closed')) or
+    (type = 'dependency' and status in ('pending','in_progress','blocked','fulfilled'))
+  ),
+  constraint raid_risk_fields check (type <> 'risk' or (probability is not null and impact is not null)),
+  constraint raid_priority_fields check (type = 'risk' or priority is not null),
+  constraint raid_dependency_fields check (type <> 'dependency' or (direction is not null and required_from is not null))
 );
+-- Not yet enforced in SQL (the app enforces them): status transitions, linked
+-- milestone/task in the same project, escalation reason / evidence / escalation
+-- owner requirements, and resolved_date lifecycle.
 
 create table if not exists public.project_updates (
-  id          uuid primary key default gen_random_uuid(),
-  project_id  uuid not null references public.projects(id) on delete cascade,
-  author      text not null,
-  kind        text not null check (kind in ('status','milestone','risk','decision','general')),
-  summary     text not null,
-  created_at  timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  project_id    uuid not null references public.projects(id) on delete cascade,
+  author        text not null,
+  kind          text not null check (kind in ('status','milestone','risk','decision','general','raid')),
+  summary       text not null,
+  raid_item_id  uuid,  -- activity history of a RAID record (kept after the record is deleted)
+  created_at    timestamptz not null default now()
 );
 
 create index if not exists tasks_project_idx on public.tasks(project_id);

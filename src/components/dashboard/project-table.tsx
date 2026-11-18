@@ -34,7 +34,7 @@ export function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {projects.map(({ project, progress, overdueTasks, blockedTasks, milestones, openRisks, openIssues, scheduleElapsed, budgetBurn }) => (
+              {projects.map(({ project, progress, overdueTasks, blockedTasks, milestones, raid, scheduleElapsed, budgetBurn }) => (
                 <tr key={project.id} className="relative align-middle hover:bg-slate-50/60">
                   <td className="px-5 py-3">
                     <Link
@@ -77,7 +77,10 @@ export function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
                     )}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums text-slate-700">
-                    {openRisks} / {openIssues}
+                    {raid.openRisks} / {raid.openIssues}
+                    {raid.highCriticalRisks > 0 && (
+                      <p className="text-[11px] font-medium text-red-600">{raid.highCriticalRisks} high/critical</p>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <p className={cn("tabular-nums", budgetBurn > 90 ? "font-semibold text-red-600" : "text-slate-900")}>

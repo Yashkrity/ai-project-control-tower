@@ -156,6 +156,6 @@ describe("store migration v1 -> v2", () => {
     await writeFile(file, JSON.stringify(v1), "utf8");
     const task = await repo().getTask("x");
     expect(task).toMatchObject({ status: "not_started", description: "", createdAt: "2026-06-01T00:00:00.000Z" });
-    expect(JSON.parse(await readFile(file, "utf8")).version).toBe(3); // v1 upgrades through v2 to v3
+    expect(JSON.parse(await readFile(file, "utf8")).version).toBe(4); // v1 upgrades step by step to the current version
   });
 });

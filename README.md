@@ -2,7 +2,7 @@
 
 A portfolio control tower for Technical Project Managers and PMOs running many technology projects at once. It brings project health, delivery progress, milestones, tasks, dependencies and RAID (risks, assumptions, issues, dependencies) into one workspace.
 
-> **Status: Phase 4 (Milestones module).** The portfolio dashboard, Projects, Tasks and Milestones (CRUD, task-derived progress and status, views, filters, task linking) work against a **local JSON data store** that persists across refreshes and restarts. The RAID screen is a placeholder for the next phase. Supabase persistence and auth are not wired up yet.
+> **Status: Phase 5 (RAID management).** The portfolio dashboard, Projects, Tasks, Milestones and the RAID register (risks, assumptions, issues, dependencies) work against a **local JSON data store** that persists across refreshes and restarts. Supabase persistence, authentication and AI features are not wired up yet.
 
 ## Tech stack
 
@@ -71,7 +71,7 @@ src/
       projects/                List, new, [id] detail, [id]/edit, and actions.ts (server actions)
       tasks/                   List (views + filters), new, [id] detail, [id]/edit, and actions.ts
       milestones/              List (views + filters), new, [id] detail with linked tasks, [id]/edit, actions.ts
-      raid/                    Placeholder for the next module
+      raid/                    Register (tabs, focus views, filters, search, sort), new, [id] detail with history, [id]/edit, actions.ts
   components/
     layout/                    Sidebar (desktop + mobile drawer), page header, placeholder
     ui/                        Card, Badge, Button, FormField, ProgressBar, EmptyState, Skeleton
@@ -81,6 +81,7 @@ src/
   lib/
     tasks/                     Task rules (dependencies, cycles, blocked, completion) and list views
     milestones/                Milestone rules (progress, calculated status, write checks) and list views
+    raid/                      RAID governance rules, per-project summary, register views, references
     types.ts                   Domain model (Project, Task, Milestone, RaidItem, ProjectUpdate)
     data/                      Repository interface, local file store, demo seed data
     services/                  Use-cases (writes + activity log), called by server actions
@@ -114,6 +115,9 @@ supabase/schema.sql            Draft Postgres schema with RLS
 | Milestone status | Calculated, never typed in. First match wins: **Completed** (actual date recorded and every linked task done) → **Delayed** (planned completion passed) → **At risk** (due within 14 days with open tasks, or a linked task is blocked) → **In progress** (a linked task is in progress, blocked or done) → **Not started** |
 | Upcoming milestone | Not completed, planned completion between today and today + 30 days |
 | Past-due milestone | Status Delayed: not completed and planned completion is before today (unchanged definition; “completed” is now calculated) |
+| Risk score / level | Probability (1–5) × impact (1–5). Level: 1–4 Low, 5–9 Medium, 10–14 High, 15–25 Critical |
+| Overdue RAID item | Open and past its type's deadline (risk review date, assumption validation deadline, issue target resolution date, dependency required-by date) |
+| Upcoming RAID review | Open with its deadline between today and today + 14 days |
 | Schedule elapsed | (today − start) ÷ (target end − start), clamped to 0–100% |
 | Budget used | Actual spend ÷ budget (may exceed 100%) |
 
@@ -121,7 +125,7 @@ Archived projects are excluded everywhere. Completed projects count toward task 
 
 ## Demo data
 
-`src/lib/data/demo-data.ts` seeds 8 projects (4 active, 1 planning, 1 on hold, 1 completed, 1 completed and archived) with 47 tasks, including dependencies, plus 21 milestones, 9 RAID items and 9 project updates. Health spans Green, Amber and Red.
+`src/lib/data/demo-data.ts` seeds 8 projects (4 active, 1 planning, 1 on hold, 1 completed, 1 completed and archived) with 47 tasks, including dependencies, plus 21 milestones, 17 RAID records (6 risks, 3 assumptions, 4 issues, 4 dependencies; several linked to tasks or milestones) and 9 project updates. Health spans Green, Amber and Red.
 
 ## Projects module
 
@@ -176,13 +180,34 @@ Rules, enforced on the server:
 
 Activity log entries: milestone created, planned dates changed, completed, reopened (manually or because a task reopened), deleted (with what happened to its tasks), tasks added to or removed from a milestone.
 
+## RAID register
+
+| Route | Purpose |
+| --- | --- |
+| `/raid` | Tabs: All records, Risks, Assumptions, Issues, Dependencies. Focus views: open high/critical risks, overdue, escalated issues, blocked dependencies, upcoming reviews. Filters: project, owner, open/closed, status, severity, deadline range; search; sort by deadline, severity, updated or reference |
+| `/raid/new` | Create a record; `?type=`, `?project=`, `?task=`, `?milestone=` pre-fill the form |
+| `/raid/[id]` | Record detail: escalation/overdue banners, type-specific facts, impacted milestone/task, activity history |
+| `/raid/[id]/edit` | Edit; the type is fixed and status options follow the allowed transitions |
+
+Each record has a readable reference (R-001, A-001, I-001, D-001), shared fields (project, owner, deadline, resolution date, impacted milestone/task, plan, latest update) and type-specific fields: risks have probability, impact and a contingency plan; assumptions have evidence notes; issues have severity, business impact and escalation details; dependencies have internal/external, required-from party, impact if unfulfilled and an escalation owner. RAID dependencies (needs from other teams, vendors or stakeholders) are separate from task predecessors.
+
+Governance rules, enforced on the server:
+
+- **Status transitions** per type. For example, an issue must be Resolved before it is Closed, and a materialized risk can only be closed.
+- **Requirements.** Escalating an issue needs a reason (the escalation date is recorded); validating or invalidating an assumption needs evidence; a blocked dependency needs an escalation owner.
+- **Resolution date** recorded when a record reaches a closed state (risk closed/materialized, assumption validated/invalidated, issue resolved/closed, dependency fulfilled), cleared on reopen, never in the future.
+- **Associations.** The project must exist and not be archived; the impacted milestone and task must be in the same project. Deleting a task or milestone clears RAID links to it.
+- **Activity history** for every create, status change, escalation, resolution, score or priority change, deadline or owner change, latest update and delete.
+
+Project pages show open risks, high/critical risks, open and escalated issues, blocked dependencies, overdue assumptions and upcoming reviews, each linking to the filtered register, plus calculated warnings. These never change the project's RAG health, which stays manual. `projectRaidSummary()` in `src/lib/raid/summary.ts` returns the same figures as a structured object for reporting and future AI features.
+
 ## Roadmap
 
 1. ~~**Projects module.**~~ Done (local store).
 2. ~~**Tasks module.**~~ Done (local store).
 3. **Supabase data source.** Apply `supabase/schema.sql`, add a seed script, implement the Supabase repository (with the task rules in a transaction or RPC), and add auth with workspace-scoped access rules.
 4. ~~**Milestones module.**~~ Done (local store).
-5. **RAID module.** Full RAID log with severity/probability/impact and mitigation tracking.
+5. ~~**RAID module.**~~ Done (local store).
 6. **AI features.** For example status-report drafting and RAID suggestions, server-side via the Anthropic API.
 
 ## Deploying to Vercel

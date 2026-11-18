@@ -4,6 +4,7 @@ import type { TaskRow } from "@/lib/tasks/views";
 import type { MilestoneListRow } from "@/lib/milestones/views";
 import { formatProgress } from "@/lib/milestones/rules";
 import { TaskTable } from "@/components/tasks/task-table";
+import { ProjectRaidPanel } from "@/components/raid/project-raid-panel";
 import type { ProjectUpdate } from "@/lib/types";
 import type { ProjectSummary } from "@/lib/metrics/portfolio";
 import { daysBetween, formatDate, formatRelativeDays } from "@/lib/utils/dates";
@@ -148,6 +149,8 @@ export function ProjectDetail({
           <ActivityList updates={updates} today={today} />
         </div>
       </div>
+
+      <ProjectRaidPanel projectId={project.id} summary={summary.raid} archived={archived} />
 
       <ProjectTasks projectId={project.id} rows={tasks} archived={archived} />
     </div>

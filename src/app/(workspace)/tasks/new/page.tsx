@@ -17,6 +17,8 @@ async function NewTaskForm({ searchParams }: { searchParams: PageProps<"/tasks/n
 
   return (
     <TaskForm
+      // Remount when ?project changes, so client state starts fresh.
+      key={projectId}
       action={createTaskAction}
       initialValues={{ projectId, status: "not_started", priority: "medium", dependsOn: [] }}
       submitLabel="Create task"

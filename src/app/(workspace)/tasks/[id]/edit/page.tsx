@@ -22,6 +22,7 @@ async function EditTaskForm({ params }: { params: PageProps<"/tasks/[id]/edit">[
     <div className="space-y-6">
       <PageHeader title={`Edit “${task.title}”`} description="Changes are validated against the project, milestone and dependency rules." />
       <TaskForm
+        key={task.updatedAt}
         action={updateTaskAction.bind(null, task.id)}
         initialValues={taskToFormValues(task)}
         submitLabel="Save changes"

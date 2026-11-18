@@ -10,7 +10,11 @@ import type {
   Priority,
   Project,
   ProjectUpdate,
+  AssumptionItem,
+  DependencyItem,
+  IssueItem,
   RaidItem,
+  RiskItem,
   Task,
   TaskStatus,
   UpdateKind,
@@ -342,23 +346,118 @@ export function buildDemoData(today: ISODate): PortfolioData {
     }),
   );
 
-  const raid = (
-    item: Omit<RaidItem, "targetDate"> & { target: number | null },
-  ): RaidItem => {
-    const { target, ...rest } = item;
-    return { ...rest, targetDate: target === null ? null : d(target) };
+  // Shared RAID fields; offsets are days from today (null = not set).
+  type Base = {
+    id: string;
+    ref: string;
+    projectId: string;
+    title: string;
+    description: string;
+    owner: string;
+    target: number | null;
+    resolved?: number;
+    milestoneId?: string;
+    taskId?: string;
+    plan: string;
+    latestUpdate?: string;
+    created: number;
   };
+  const base = (b: Base) => ({
+    id: b.id,
+    ref: b.ref,
+    projectId: b.projectId,
+    title: b.title,
+    description: b.description,
+    owner: b.owner,
+    targetDate: b.target === null ? null : d(b.target),
+    resolvedDate: b.resolved === undefined ? null : d(b.resolved),
+    milestoneId: b.milestoneId ?? null,
+    taskId: b.taskId ?? null,
+    plan: b.plan,
+    latestUpdate: b.latestUpdate ?? "",
+    createdAt: ts(b.created, 9),
+    updatedAt: ts(Math.max(b.created, b.resolved ?? -1), 11),
+  });
+  const risk = (b: Base, r: Pick<RiskItem, "status" | "probability" | "impact" | "contingency">): RiskItem => ({ ...base(b), type: "risk", ...r });
+  const assumption = (b: Base, a: Pick<AssumptionItem, "status" | "priority" | "validationNotes">): AssumptionItem => ({ ...base(b), type: "assumption", ...a });
+  const issue = (b: Base, i: Pick<IssueItem, "status" | "priority" | "businessImpact" | "escalationReason"> & { escalated?: number }): IssueItem => {
+    const { escalated, ...rest } = i;
+    return { ...base(b), type: "issue", ...rest, escalatedDate: escalated === undefined ? null : d(escalated) };
+  };
+  const dependency = (
+    b: Base,
+    x: Pick<DependencyItem, "status" | "priority" | "direction" | "requiredFrom" | "impactIfUnfulfilled" | "escalationOwner">,
+  ): DependencyItem => ({ ...base(b), type: "dependency", ...x });
 
   const raidItems: RaidItem[] = [
-    raid({ id: "r-erp-1", projectId: "prj-erp", type: "risk", title: "Finance data quality may delay cutover", description: "Legacy GL contains ~4% unreconciled entries.", owner: "Ravi Patel", severity: "high", probability: "medium", impact: "high", mitigation: "Run weekly reconciliation sprints with client finance team.", status: "open", target: 21 }),
-    raid({ id: "r-erp-2", projectId: "prj-erp", type: "dependency", title: "Azure landing zone from client IT", description: "Production subscription must be ready before cutover rehearsal.", owner: "Marcus Lee", severity: "medium", probability: "low", impact: "high", mitigation: "Escalated to client CIO; weekly checkpoint.", status: "monitoring", target: 40 }),
-    raid({ id: "r-mob-1", projectId: "prj-mobile", type: "assumption", title: "Loyalty API stays on v3", description: "Client confirmed no breaking changes before launch.", owner: "Tom Becker", severity: "low", probability: "low", impact: "medium", mitigation: "Contract tests in CI.", status: "open", target: 55 }),
-    raid({ id: "r-dat-1", projectId: "prj-data", type: "issue", title: "Pharmacy vendor feed schema changed", description: "Vendor shipped an unannounced schema change; pipeline blocked.", owner: "Elena Rossi", severity: "high", probability: "high", impact: "high", mitigation: "Vendor fix due next week; interim manual load approved.", status: "open", target: 5 }),
-    raid({ id: "r-dat-2", projectId: "prj-data", type: "risk", title: "Budget exhausted before decommission", description: "Spend at 96% with 2 milestones outstanding.", owner: "Sofia Martinez", severity: "high", probability: "high", impact: "high", mitigation: "Change request for additional funding raised with sponsor.", status: "open", target: 10 }),
-    raid({ id: "r-dat-3", projectId: "prj-data", type: "risk", title: "Clinical sign-off availability", description: "Clinical SMEs have limited availability in the next month.", owner: "Ivy Nguyen", severity: "medium", probability: "medium", impact: "high", mitigation: "Pre-book review slots; async sign-off pack.", status: "open", target: 12 }),
-    raid({ id: "r-zt-1", projectId: "prj-zt", type: "risk", title: "User friction from MFA prompts", description: "Pilot users may push back on additional prompts.", owner: "Ben Harper", severity: "medium", probability: "medium", impact: "medium", mitigation: "Phased policies and clear comms.", status: "monitoring", target: 20 }),
-    raid({ id: "r-crm-1", projectId: "prj-crm", type: "issue", title: "Programme paused pending re-org", description: "Client sales re-organisation changes account ownership model.", owner: "Aisha Rahman", severity: "high", probability: "high", impact: "medium", mitigation: "Awaiting new org chart from client HR.", status: "open", target: 14 }),
-    raid({ id: "r-ai-1", projectId: "prj-aisd", type: "dependency", title: "Data residency approval", description: "Legal must approve the model hosting region.", owner: "Mei Tanaka", severity: "high", probability: "medium", impact: "high", mitigation: "Review scheduled with legal.", status: "open", target: 9 }),
+    risk(
+      { id: "raid-r1", ref: "R-001", projectId: "prj-erp", title: "Finance data quality may delay cutover", description: "Legacy GL contains about 4% unreconciled entries that must be cleared before migration.", owner: "Ravi Patel", target: 5, milestoneId: "ms-erp-4", taskId: "t-erp-04", plan: "Weekly reconciliation sprints with the client finance team.", latestUpdate: "Unreconciled entries down to 2.1%.", created: -60 },
+      { status: "mitigating", probability: 3, impact: 4, contingency: "Migrate open balances only and reconcile history post go-live." },
+    ),
+    risk(
+      { id: "raid-r2", ref: "R-002", projectId: "prj-data", title: "Budget exhausted before decommission", description: "Spend is at 96% with two milestones outstanding.", owner: "Sofia Martinez", target: -2, milestoneId: "ms-dat-4", plan: "Change request for additional funding raised with the sponsor.", latestUpdate: "Awaiting steering committee decision.", created: -20 },
+      { status: "open", probability: 5, impact: 4, contingency: "Defer Hadoop decommission to a follow-on phase." },
+    ),
+    risk(
+      { id: "raid-r3", ref: "R-003", projectId: "prj-data", title: "Clinical sign-off availability", description: "Clinical SMEs have limited availability in the next month.", owner: "Ivy Nguyen", target: 6, milestoneId: "ms-dat-3", plan: "Pre-book review slots; prepare an asynchronous sign-off pack.", created: -15 },
+      { status: "open", probability: 3, impact: 4, contingency: "Escalate to the chief medical officer for delegated sign-off." },
+    ),
+    risk(
+      { id: "raid-r4", ref: "R-004", projectId: "prj-zt", title: "User friction from MFA prompts", description: "Pilot users may push back on additional sign-in prompts.", owner: "Ben Harper", target: 20, milestoneId: "ms-zt-2", plan: "Phased policies and clear communications.", created: -30 },
+      { status: "mitigating", probability: 3, impact: 2, contingency: "Relax prompt frequency for low-risk apps." },
+    ),
+    risk(
+      { id: "raid-r5", ref: "R-005", projectId: "prj-mobile", title: "App store review rejection", description: "New loyalty features may trigger additional App Store review.", owner: "Hana Ito", target: 12, milestoneId: "ms-mob-3", plan: "Pre-submission review against current store guidelines.", created: -10 },
+      { status: "open", probability: 2, impact: 5, contingency: "Ship without loyalty features and enable them by remote config." },
+    ),
+    risk(
+      { id: "raid-r6", ref: "R-006", projectId: "prj-portal", title: "Broker adoption below target", description: "Brokers may keep using email for quotes.", owner: "Daniel Okafor", target: -20, resolved: -15, plan: "Broker training webinars.", latestUpdate: "Adoption reached 82%; risk closed.", created: -120 },
+      { status: "closed", probability: 2, impact: 2, contingency: "" },
+    ),
+    assumption(
+      { id: "raid-a1", ref: "A-001", projectId: "prj-mobile", title: "Loyalty API stays on v3", description: "The loyalty API will remain on v3 with no breaking changes before launch.", owner: "Tom Becker", target: 10, taskId: "t-mob-04", plan: "Confirm in writing with the loyalty platform owner.", created: -40 },
+      { status: "pending", priority: "medium", validationNotes: "" },
+    ),
+    assumption(
+      { id: "raid-a2", ref: "A-002", projectId: "prj-erp", title: "Client finance team available for UAT", description: "Two client finance users are available full-time during warehouse UAT.", owner: "Priya Sharma", target: -3, milestoneId: "ms-erp-3", plan: "Confirm named users with the client finance director.", created: -25 },
+      { status: "pending", priority: "high", validationNotes: "" },
+    ),
+    assumption(
+      { id: "raid-a3", ref: "A-003", projectId: "prj-aisd", title: "Ticket history is representative", description: "Six months of tickets reflect the request mix the pilot will see.", owner: "Noah Fischer", target: -2, resolved: -2, taskId: "t-ai-01", plan: "Compare category mix against the prior year.", created: -9 },
+      { status: "validated", priority: "medium", validationNotes: "Category mix within 3% of the prior 12 months." },
+    ),
+    issue(
+      { id: "raid-i1", ref: "I-001", projectId: "prj-data", title: "Pharmacy vendor feed schema changed", description: "The vendor shipped an unannounced schema change; the pipeline is blocked.", owner: "Elena Rossi", target: 5, taskId: "t-dat-03", plan: "Vendor fix due next week; interim manual load approved.", latestUpdate: "Vendor has acknowledged the defect.", created: -6 },
+      { status: "escalated", priority: "critical", businessImpact: "No pharmacy data in the lakehouse; parity sign-off at risk.", escalationReason: "Vendor missed two committed fix dates.", escalated: -3 },
+    ),
+    issue(
+      { id: "raid-i2", ref: "I-002", projectId: "prj-crm", title: "Programme paused pending re-org", description: "The client's sales re-organisation changes the account ownership model.", owner: "Aisha Rahman", target: -1, plan: "Awaiting the new org chart from client HR.", created: -5 },
+      { status: "investigating", priority: "high", businessImpact: "Merge rules cannot be finalised; go-live date at risk.", escalationReason: "" },
+    ),
+    issue(
+      { id: "raid-i3", ref: "I-003", projectId: "prj-erp", title: "SIT defects above exit threshold", description: "42 open defects against an exit threshold of 15.", owner: "Leah Chen", target: 7, milestoneId: "ms-erp-2", taskId: "t-erp-05", plan: "Daily triage; vendor adds two developers.", created: -8 },
+      { status: "open", priority: "high", businessImpact: "Finance SIT exit is delayed.", escalationReason: "" },
+    ),
+    issue(
+      { id: "raid-i4", ref: "I-004", projectId: "prj-portal", title: "Load test failed at 500 users", description: "Quote engine timed out under load.", owner: "Hana Ito", target: -30, resolved: -29, taskId: "t-por-04", plan: "Add caching and scale the quote service.", latestUpdate: "Retest passed at 1,200 users.", created: -35 },
+      { status: "closed", priority: "high", businessImpact: "GA could not proceed.", escalationReason: "" },
+    ),
+    dependency(
+      { id: "raid-d1", ref: "D-001", projectId: "prj-erp", title: "Azure landing zone from client IT", description: "The production subscription must be ready before the cutover rehearsal.", owner: "Marcus Lee", target: 40, milestoneId: "ms-erp-4", plan: "Weekly checkpoint with client IT.", created: -50 },
+      { status: "in_progress", priority: "high", direction: "external", requiredFrom: "Northwind Logistics IT", impactIfUnfulfilled: "Cutover rehearsal cannot start.", escalationOwner: "Priya Sharma" },
+    ),
+    dependency(
+      { id: "raid-d2", ref: "D-002", projectId: "prj-aisd", title: "Data residency approval", description: "Legal must approve the model hosting region.", owner: "Mei Tanaka", target: 9, taskId: "t-ai-03", plan: "Review scheduled with legal.", latestUpdate: "Legal requested a DPIA before review.", created: -8 },
+      { status: "blocked", priority: "critical", direction: "external", requiredFrom: "Harbor Financial Legal", impactIfUnfulfilled: "Pilot cannot go live in any region.", escalationOwner: "Priya Sharma" },
+    ),
+    dependency(
+      { id: "raid-d3", ref: "D-003", projectId: "prj-zt", title: "Device management licences", description: "Additional endpoint licences for the full rollout.", owner: "Carlos Diaz", target: 14, milestoneId: "ms-zt-3", plan: "Purchase order raised.", created: -12 },
+      { status: "pending", priority: "medium", direction: "external", requiredFrom: "Microsoft (licensing partner)", impactIfUnfulfilled: "Rollout waves 2-4 cannot start.", escalationOwner: "James Whitfield" },
+    ),
+    dependency(
+      { id: "raid-d4", ref: "D-004", projectId: "prj-mobile", title: "Loyalty platform sandbox", description: "Sandbox environment with test member accounts.", owner: "Tom Becker", target: -45, resolved: -44, plan: "Request via the loyalty team backlog.", created: -70 },
+      { status: "fulfilled", priority: "medium", direction: "internal", requiredFrom: "Apex Retail loyalty team", impactIfUnfulfilled: "Saved baskets could not be tested.", escalationOwner: "Daniel Okafor" },
+    ),
   ];
 
   const update = (
