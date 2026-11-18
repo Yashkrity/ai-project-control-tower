@@ -42,9 +42,15 @@ export const makeMilestone = (over: Partial<Milestone> = {}): Milestone => ({
   id: "m1",
   projectId: "p1",
   name: "Milestone",
+  description: "",
+  owner: "Owner",
+  priority: "medium",
+  plannedStartDate: "2026-06-01",
   plannedDate: "2026-07-01",
   actualDate: null,
-  status: "not_started",
+  notes: "",
+  createdAt: "2026-06-01T09:00:00.000Z",
+  updatedAt: "2026-06-01T09:00:00.000Z",
   ...over,
 });
 

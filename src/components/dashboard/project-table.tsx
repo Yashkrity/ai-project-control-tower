@@ -19,7 +19,7 @@ export function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
         <EmptyState icon={FolderKanban} title="No projects yet" description="Projects you create will appear here." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
+          <table className="w-full min-w-[1000px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs text-slate-500">
               <tr>
                 <th scope="col" className="px-5 py-2.5 font-medium">Project</th>
@@ -28,12 +28,13 @@ export function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
                 <th scope="col" className="w-56 px-3 py-2.5 font-medium">Progress</th>
                 <th scope="col" className="px-3 py-2.5 text-right font-medium">Overdue</th>
                 <th scope="col" className="px-3 py-2.5 text-right font-medium">Blocked</th>
+                <th scope="col" className="px-3 py-2.5 text-right font-medium">Milestones done</th>
                 <th scope="col" className="px-3 py-2.5 text-right font-medium">Open risks / issues</th>
                 <th scope="col" className="px-5 py-2.5 text-right font-medium">Budget used</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {projects.map(({ project, progress, overdueTasks, blockedTasks, openRisks, openIssues, scheduleElapsed, budgetBurn }) => (
+              {projects.map(({ project, progress, overdueTasks, blockedTasks, milestones, openRisks, openIssues, scheduleElapsed, budgetBurn }) => (
                 <tr key={project.id} className="relative align-middle hover:bg-slate-50/60">
                   <td className="px-5 py-3">
                     <Link
@@ -64,6 +65,16 @@ export function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
                   </td>
                   <td className={cn("px-3 py-3 text-right tabular-nums", blockedTasks > 0 ? "font-semibold text-red-600" : "text-slate-500")}>
                     {blockedTasks}
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    <p className="tabular-nums text-slate-900">
+                      {milestones.total === 0 ? <span className="text-slate-400">—</span> : `${milestones.completed}/${milestones.total}`}
+                    </p>
+                    {(milestones.delayed > 0 || milestones.atRisk > 0) && (
+                      <p className="text-[11px] font-medium text-red-600">
+                        {[milestones.delayed && `${milestones.delayed} delayed`, milestones.atRisk && `${milestones.atRisk} at risk`].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums text-slate-700">
                     {openRisks} / {openIssues}

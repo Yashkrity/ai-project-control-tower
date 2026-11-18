@@ -6,7 +6,6 @@
 import type {
   ISODate,
   Milestone,
-  MilestoneStatus,
   PortfolioData,
   Priority,
   Project,
@@ -33,8 +32,9 @@ type TaskSpec = [
 type MilestoneSpec = [
   id: string,
   name: string,
+  startOffset: number,
   plannedOffset: number,
-  status: MilestoneStatus,
+  priority: Priority,
   actualOffset?: number,
 ];
 
@@ -184,52 +184,61 @@ export function buildDemoData(today: ISODate): PortfolioData {
     }),
   ];
 
+  // [id, title, plannedStart, plannedCompletion, priority, actualCompletion?]
+  // Status is not stored: it is calculated from linked tasks and dates.
   const milestoneSpecs: Record<string, MilestoneSpec[]> = {
     "prj-erp": [
-      ["ms-erp-1", "Solution blueprint signed off", -85, "completed", -82],
-      ["ms-erp-2", "Finance module SIT complete", -10, "in_progress"],
-      ["ms-erp-3", "Warehouse module UAT", 25, "not_started"],
-      ["ms-erp-4", "Production cutover", 85, "not_started"],
+      ["ms-erp-1", "Solution blueprint signed off", -118, -85, "high", -82],
+      ["ms-erp-2", "Finance module SIT complete", -80, -10, "high"],
+      ["ms-erp-3", "Warehouse module UAT", -15, 25, "medium"],
+      ["ms-erp-4", "Production cutover", 30, 85, "critical"],
     ],
     "prj-mobile": [
-      ["ms-mob-1", "Design system approved", -50, "completed", -51],
-      ["ms-mob-2", "Beta release to TestFlight", 6, "in_progress"],
-      ["ms-mob-3", "App store launch", 55, "not_started"],
+      ["ms-mob-1", "Design system approved", -74, -50, "high", -51],
+      ["ms-mob-2", "Beta release to TestFlight", -45, 6, "high"],
+      ["ms-mob-3", "App store launch", 5, 55, "critical"],
     ],
     "prj-data": [
-      ["ms-dat-1", "Lakehouse foundation live", -90, "completed", -76],
-      ["ms-dat-2", "Ingestion pipelines migrated", -21, "in_progress"],
-      ["ms-dat-3", "Clinical reports parity sign-off", 12, "not_started"],
-      ["ms-dat-4", "Legacy cluster decommissioned", 30, "not_started"],
+      ["ms-dat-1", "Lakehouse foundation live", -148, -90, "high", -76],
+      ["ms-dat-2", "Ingestion pipelines migrated", -90, -21, "critical"],
+      ["ms-dat-3", "Clinical reports parity sign-off", -30, 12, "high"],
+      ["ms-dat-4", "Legacy cluster decommissioned", 10, 30, "medium"],
     ],
     "prj-zt": [
-      ["ms-zt-1", "Identity provider consolidated", -5, "completed", -6],
-      ["ms-zt-2", "Device posture pilot (200 users)", 18, "in_progress"],
-      ["ms-zt-3", "Full endpoint rollout", 120, "not_started"],
+      ["ms-zt-1", "Identity provider consolidated", -38, -5, "high", -6],
+      ["ms-zt-2", "Device posture pilot (200 users)", -6, 18, "high"],
+      ["ms-zt-3", "Full endpoint rollout", 15, 120, "medium"],
     ],
     "prj-crm": [
-      ["ms-crm-1", "Data mapping workshop", -60, "completed", -60],
-      ["ms-crm-2", "Org merge dry run", -15, "not_started"],
-      ["ms-crm-3", "Global org go-live", 70, "not_started"],
+      ["ms-crm-1", "Data mapping workshop", -85, -60, "medium", -58],
+      ["ms-crm-2", "Org merge dry run", -55, -15, "high"],
+      ["ms-crm-3", "Global org go-live", 30, 70, "critical"],
     ],
     "prj-aisd": [
-      ["ms-ai-1", "Pilot scope & success criteria", 9, "in_progress"],
-      ["ms-ai-2", "Pilot go-live", 75, "not_started"],
+      ["ms-ai-1", "Pilot scope & success criteria", -9, 9, "high"],
+      ["ms-ai-2", "Pilot go-live", 10, 75, "critical"],
     ],
     "prj-portal": [
-      ["ms-por-1", "Broker beta", -90, "completed", -92],
-      ["ms-por-2", "General availability", -25, "completed", -21],
+      ["ms-por-1", "Broker beta", -200, -90, "high", -92],
+      ["ms-por-2", "General availability", -90, -25, "critical", -21],
     ],
   };
 
+  const pmOf = new Map(projects.map((p) => [p.id, p.projectManager]));
   const milestones: Milestone[] = Object.entries(milestoneSpecs).flatMap(([projectId, specs]) =>
-    specs.map(([id, name, planned, status, actual]) => ({
+    specs.map(([id, name, start, planned, priority, actual]) => ({
       id,
       projectId,
       name,
+      description: "",
+      owner: pmOf.get(projectId) ?? "Unassigned",
+      priority,
+      plannedStartDate: d(start),
       plannedDate: d(planned),
       actualDate: actual === undefined ? null : d(actual),
-      status,
+      notes: "",
+      createdAt: ts(Math.min(start, -1), 8),
+      updatedAt: ts(actual ?? Math.min(start, 0), 9),
     })),
   );
 

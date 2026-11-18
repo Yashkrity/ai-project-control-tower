@@ -48,7 +48,7 @@ function completionText(task: Task): string | null {
 export function TaskDetail({
   task,
   project,
-  milestoneName,
+  milestone,
   predecessors,
   successors,
   block,
@@ -56,7 +56,7 @@ export function TaskDetail({
 }: {
   task: Task;
   project: Project;
-  milestoneName: string | null;
+  milestone: { id: string; name: string } | null;
   predecessors: Task[];
   successors: Task[];
   block: BlockInfo;
@@ -127,7 +127,15 @@ export function TaskDetail({
           <div className="space-y-5 px-5 py-4">
             <dl className="grid gap-4 sm:grid-cols-2">
               <Detail label="Project">{project.name}</Detail>
-              <Detail label="Milestone">{milestoneName ?? <span className="text-slate-400">None</span>}</Detail>
+              <Detail label="Milestone">
+                {milestone ? (
+                  <Link href={`/milestones/${milestone.id}`} className="font-medium text-indigo-700 hover:text-indigo-600">
+                    {milestone.name}
+                  </Link>
+                ) : (
+                  <span className="text-slate-400">None</span>
+                )}
+              </Detail>
               <Detail label="Owner">{task.owner}</Detail>
               <Detail label="Priority">{humanize(task.priority)}</Detail>
               <Detail label="Start date">{formatDate(task.startDate)}</Detail>

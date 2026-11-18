@@ -7,6 +7,7 @@ import type { ISODate, Task, TaskInput } from "@/lib/types";
 import { assertTaskDeletable, resolveTaskWrite, type TaskWriteResult } from "@/lib/tasks/rules";
 import { daysBetween, formatDate } from "@/lib/utils/dates";
 import { CURRENT_ACTOR } from "./projects";
+import { reopenMilestoneIfIncomplete } from "./milestones";
 
 export interface TaskWriteContext {
   today: ISODate;
@@ -40,6 +41,25 @@ async function logWrite(repo: PortfolioRepository, task: Task, before: Task | nu
 
   for (const entry of entries) {
     await repo.addProjectUpdate({ projectId: task.projectId, author: CURRENT_ACTOR, ...entry });
+  }
+
+  await syncMilestones(repo, task, before);
+}
+
+/** Logs milestone association changes and reopens a completed milestone that gained open work. */
+async function syncMilestones(repo: PortfolioRepository, task: Task, before: Task | null) {
+  const from = before?.milestoneId ?? null;
+  const to = task.milestoneId;
+  const nameOf = async (id: string) => (await repo.getMilestone(id))?.name ?? "a deleted milestone";
+  const note = (summary: string) => repo.addProjectUpdate({ projectId: task.projectId, author: CURRENT_ACTOR, kind: "milestone", summary });
+
+  if (from !== to) {
+    if (from) await note(`“${task.title}” removed from milestone “${await nameOf(from)}”.`);
+    if (to) await note(`“${task.title}” added to milestone “${await nameOf(to)}”.`);
+  }
+  if (to && task.status !== "done") {
+    const milestone = await repo.getMilestone(to);
+    if (milestone?.actualDate) await reopenMilestoneIfIncomplete(repo, to, `task “${task.title}” is no longer done`);
   }
 }
 

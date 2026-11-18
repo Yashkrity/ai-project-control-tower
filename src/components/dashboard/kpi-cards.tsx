@@ -78,12 +78,12 @@ export function KpiCards({ summary }: { summary: PortfolioSummary }) {
         label="Milestones (next 30 days)"
         value={String(summary.upcomingMilestones.length)}
         detail={
-          nextMilestone
-            ? `${summary.pastDueMilestoneCount} past due · next in ${nextMilestone.daysUntil}d`
-            : `${summary.pastDueMilestoneCount} past due`
+          `${summary.pastDueMilestoneCount} past due · ${summary.atRiskMilestoneCount} at risk` +
+          (nextMilestone ? ` · next in ${nextMilestone.daysUntil}d` : "")
         }
         icon={CalendarClock}
         tone={summary.pastDueMilestoneCount > 0 ? "alert" : "default"}
+        href="/milestones?view=upcoming"
       />
       <Kpi
         label="Budget spent (active)"

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Milestone, PortfolioData, Project, Task } from "@/lib/types";
 import { buildDemoData } from "@/lib/data/demo-data";
+import { makeMilestone } from "@/test-utils/fixtures";
 import {
   budgetBurnPercent,
   buildPortfolioSummary,
-  isMilestoneDelayed,
   isTaskOverdue,
   scheduleElapsedPercent,
   taskCompletion,
@@ -48,15 +48,7 @@ const task = (over: Partial<Task> = {}): Task => ({
   ...over,
 });
 
-const milestone = (over: Partial<Milestone> = {}): Milestone => ({
-  id: "m1",
-  projectId: "p1",
-  name: "M",
-  plannedDate: "2026-06-20",
-  actualDate: null,
-  status: "not_started",
-  ...over,
-});
+const milestone = (over: Partial<Milestone> = {}): Milestone => makeMilestone({ plannedDate: "2026-06-20", ...over });
 
 describe("isTaskOverdue", () => {
   it("is overdue only when open and due strictly before today", () => {
@@ -67,18 +59,6 @@ describe("isTaskOverdue", () => {
   });
 });
 
-describe("isMilestoneDelayed", () => {
-  it("flags open milestones past their planned date", () => {
-    expect(isMilestoneDelayed(milestone({ plannedDate: "2026-06-10" }), TODAY)).toBe(true);
-    expect(isMilestoneDelayed(milestone({ plannedDate: TODAY }), TODAY)).toBe(false);
-  });
-  it("flags completed milestones that finished late", () => {
-    const late = milestone({ status: "completed", plannedDate: "2026-06-01", actualDate: "2026-06-05" });
-    const onTime = milestone({ status: "completed", plannedDate: "2026-06-01", actualDate: "2026-06-01" });
-    expect(isMilestoneDelayed(late, TODAY)).toBe(true);
-    expect(isMilestoneDelayed(onTime, TODAY)).toBe(false);
-  });
-});
 
 describe("taskCompletion", () => {
   it("returns 0% for no tasks instead of dividing by zero", () => {
@@ -121,7 +101,7 @@ describe("buildPortfolioSummary", () => {
       milestone({ plannedDate: "2026-06-20" }),
       milestone({ id: "m2", plannedDate: "2026-08-01" }), // beyond 30d
       milestone({ id: "m3", plannedDate: "2026-06-01" }), // open, past due
-      milestone({ id: "m4", plannedDate: "2026-06-01", actualDate: "2026-06-03", status: "completed" }), // completed late
+      milestone({ id: "m4", plannedDate: "2026-06-01", actualDate: "2026-06-03" }), // completed (no tasks), late
     ],
     raidItems: [],
     updates: [],
@@ -146,10 +126,10 @@ describe("buildPortfolioSummary", () => {
       ["b", 5],
     ]);
   });
-  it("lists upcoming milestones within the horizon and counts delayed ones", () => {
+  it("lists upcoming milestones within the horizon and counts past-due (Delayed) ones", () => {
     expect(s.upcomingMilestones.map((r) => r.milestone.id)).toEqual(["m1"]);
-    expect(s.pastDueMilestoneCount).toBe(1);
-    expect(s.delayedMilestoneCount).toBe(2);
+    expect(s.pastDueMilestoneCount).toBe(1); // m3; m4 is completed even though it finished late
+    expect(s.atRiskMilestoneCount).toBe(0);
   });
 });
 

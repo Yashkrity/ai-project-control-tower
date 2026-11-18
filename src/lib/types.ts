@@ -21,7 +21,12 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const PRIORITIES = ["low", "medium", "high", "critical"] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
-export const MILESTONE_STATUSES = ["not_started", "in_progress", "completed"] as const;
+/**
+ * Milestone status is calculated (see src/lib/milestones/rules.ts), never
+ * stored or typed in. Listed in precedence order, highest first:
+ * completed > delayed > at_risk > in_progress > not_started.
+ */
+export const MILESTONE_STATUSES = ["not_started", "in_progress", "at_risk", "delayed", "completed"] as const;
 export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
 
 export const RAID_TYPES = ["risk", "assumption", "issue", "dependency"] as const;
@@ -74,11 +79,32 @@ export type ProjectInput = Pick<
 export interface Milestone {
   id: string;
   projectId: string;
+  /** Shown as "Title" in the UI. */
   name: string;
+  description: string;
+  owner: string;
+  priority: Priority;
+  plannedStartDate: ISODate;
+  /** Planned completion date. */
   plannedDate: ISODate;
+  /**
+   * Actual completion date. Can only be recorded while every linked task is
+   * done; cleared automatically if a linked task is reopened.
+   */
   actualDate: ISODate | null;
-  status: MilestoneStatus;
+  notes: string;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
 }
+
+/** Fields a user can set when creating or editing a milestone. */
+export type MilestoneInput = Pick<
+  Milestone,
+  "projectId" | "name" | "description" | "owner" | "priority" | "plannedStartDate" | "plannedDate" | "actualDate" | "notes"
+>;
+
+/** A milestone as stored, minus the fields the repository assigns. */
+export type MilestoneDraft = Omit<Milestone, "id" | "createdAt" | "updatedAt">;
 
 export interface Task {
   id: string;

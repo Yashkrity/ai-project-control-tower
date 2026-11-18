@@ -32,7 +32,7 @@ export function TaskForm({
   submitLabel: string;
   cancelHref: string;
   projects: { id: string; name: string }[];
-  milestones: { id: string; projectId: string; name: string }[];
+  milestones: { id: string; projectId: string; name: string; completed?: boolean }[];
   tasks: TaskOption[];
   owners: string[];
   currentTaskId?: string;
@@ -135,6 +135,7 @@ export function TaskForm({
               {projectMilestones.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
+                  {m.completed ? " (completed)" : ""}
                 </option>
               ))}
             </select>

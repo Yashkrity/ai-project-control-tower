@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { Archive, ArrowLeft, CalendarX2, ListChecks, MessageSquareDashed, Pencil, Plus } from "lucide-react";
 import type { TaskRow } from "@/lib/tasks/views";
+import type { MilestoneListRow } from "@/lib/milestones/views";
+import { formatProgress } from "@/lib/milestones/rules";
 import { TaskTable } from "@/components/tasks/task-table";
-import type { Milestone, ProjectUpdate } from "@/lib/types";
-import { isMilestoneDelayed, type ProjectSummary } from "@/lib/metrics/portfolio";
+import type { ProjectUpdate } from "@/lib/types";
+import type { ProjectSummary } from "@/lib/metrics/portfolio";
 import { daysBetween, formatDate, formatRelativeDays } from "@/lib/utils/dates";
-import { cn, formatCurrency, humanize } from "@/lib/utils/format";
+import { cn, formatCurrency } from "@/lib/utils/format";
 import { archiveProjectAction, restoreProjectAction } from "@/app/(workspace)/projects/actions";
-import { ArchivedBadge, Badge, HealthBadge, ProjectStatusBadge } from "@/components/ui/badge";
+import { ArchivedBadge, HealthBadge, MilestoneStatusBadge, ProjectStatusBadge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
@@ -41,7 +43,7 @@ export function ProjectDetail({
   today,
 }: {
   summary: ProjectSummary;
-  milestones: Milestone[];
+  milestones: MilestoneListRow[];
   updates: ProjectUpdate[];
   tasks: TaskRow[];
   today: string;
@@ -142,7 +144,7 @@ export function ProjectDetail({
         </Card>
 
         <div className="space-y-6">
-          <MilestoneList milestones={milestones} today={today} />
+          <MilestoneList projectId={project.id} rows={milestones} archived={archived} />
           <ActivityList updates={updates} today={today} />
         </div>
       </div>
@@ -181,24 +183,37 @@ function ProjectTasks({ projectId, rows, archived }: { projectId: string; rows: 
   );
 }
 
-function MilestoneList({ milestones, today }: { milestones: Milestone[]; today: string }) {
+function MilestoneList({ projectId, rows, archived }: { projectId: string; rows: MilestoneListRow[]; archived: boolean }) {
+  const done = rows.filter((r) => r.state.status === "completed").length;
   return (
     <Card>
-      <CardHeader title="Milestones" description="Editing arrives with the Milestones module" />
-      {milestones.length === 0 ? (
+      <CardHeader
+        title="Milestones"
+        description={rows.length ? `${done} of ${rows.length} completed · status is calculated from tasks` : undefined}
+        action={
+          !archived ? (
+            <Link href={`/milestones/new?project=${projectId}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-500">
+              Add milestone
+            </Link>
+          ) : undefined
+        }
+      />
+      {rows.length === 0 ? (
         <EmptyState icon={CalendarX2} title="No milestones" />
       ) : (
         <ul className="divide-y divide-slate-100">
-          {milestones.map((m) => (
-            <li key={m.id} className="flex items-start justify-between gap-3 px-5 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900">{m.name}</p>
-                <p className="text-xs text-slate-500">
-                  {humanize(m.status)} · planned {formatDate(m.plannedDate)}
-                  {m.actualDate && ` · done ${formatDate(m.actualDate)}`}
-                </p>
+          {rows.map(({ milestone: m, state }) => (
+            <li key={m.id} className="relative space-y-1.5 px-5 py-3 hover:bg-slate-50/70">
+              <div className="flex items-start justify-between gap-3">
+                <Link href={`/milestones/${m.id}`} className="min-w-0 text-sm font-medium text-slate-900 after:absolute after:inset-0 hover:text-indigo-700">
+                  {m.name}
+                </Link>
+                <MilestoneStatusBadge status={state.status} />
               </div>
-              {isMilestoneDelayed(m, today) && <Badge tone="red">Delayed</Badge>}
+              <p className="text-xs text-slate-500">
+                {state.status === "completed" && m.actualDate ? `Done ${formatDate(m.actualDate)}` : `Planned ${formatDate(m.plannedDate)}`} ·{" "}
+                {formatProgress(state.progress)}
+              </p>
             </li>
           ))}
         </ul>

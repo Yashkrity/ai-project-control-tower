@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import type { Health, Priority, ProjectStatus, TaskStatus } from "@/lib/types";
+import { Flag } from "lucide-react";
+import type { Health, MilestoneStatus, Priority, ProjectStatus, TaskStatus } from "@/lib/types";
 import { cn, humanize } from "@/lib/utils/format";
 
 type Tone = "neutral" | "green" | "amber" | "red" | "blue" | "violet";
@@ -62,6 +63,32 @@ const TASK_STATUS_TONE: Record<TaskStatus, Tone> = {
 
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   return <Badge tone={TASK_STATUS_TONE[status]}>{humanize(status)}</Badge>;
+}
+
+const MILESTONE_STATUS_TONE: Record<MilestoneStatus, Tone> = {
+  not_started: "neutral",
+  in_progress: "blue",
+  at_risk: "amber",
+  delayed: "red",
+  completed: "green",
+};
+
+/**
+ * Calculated milestone status. Drawn as a squared tag with a flag icon so it
+ * is never mistaken for a project's manual RAG health (round pill with dot).
+ */
+export function MilestoneStatusBadge({ status }: { status: MilestoneStatus }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+        TONES[MILESTONE_STATUS_TONE[status]],
+      )}
+    >
+      <Flag className="size-3" aria-hidden />
+      {humanize(status)}
+    </span>
+  );
 }
 
 export function ArchivedBadge() {

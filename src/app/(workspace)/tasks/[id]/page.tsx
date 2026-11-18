@@ -23,7 +23,7 @@ async function TaskContent({ params }: { params: PageProps<"/tasks/[id]">["param
     <TaskDetail
       task={task}
       project={project}
-      milestoneName={data.milestones.find((m) => m.id === task.milestoneId)?.name ?? null}
+      milestone={data.milestones.find((m) => m.id === task.milestoneId) ?? null}
       predecessors={task.dependsOn.map((d) => byId.get(d)).filter((t) => t !== undefined)}
       successors={successorsOf(task.id, data.tasks)}
       block={taskBlockInfo(task, byId, today)}

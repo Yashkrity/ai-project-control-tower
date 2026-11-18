@@ -2,7 +2,7 @@
 
 A portfolio control tower for Technical Project Managers and PMOs running many technology projects at once. It brings project health, delivery progress, milestones, tasks, dependencies and RAID (risks, assumptions, issues, dependencies) into one workspace.
 
-> **Status: Phase 3 (Tasks module).** The portfolio dashboard, Projects (create, edit, archive, restore) and Tasks (CRUD, views, filters, dependencies, completion tracking) work against a **local JSON data store** that persists across refreshes and restarts. Milestones and RAID screens are placeholders for the next phases. Supabase persistence and auth are not wired up yet.
+> **Status: Phase 4 (Milestones module).** The portfolio dashboard, Projects, Tasks and Milestones (CRUD, task-derived progress and status, views, filters, task linking) work against a **local JSON data store** that persists across refreshes and restarts. The RAID screen is a placeholder for the next phase. Supabase persistence and auth are not wired up yet.
 
 ## Tech stack
 
@@ -70,7 +70,8 @@ src/
       error.tsx                Error boundary with retry
       projects/                List, new, [id] detail, [id]/edit, and actions.ts (server actions)
       tasks/                   List (views + filters), new, [id] detail, [id]/edit, and actions.ts
-      milestones/ raid/        Placeholders for upcoming modules
+      milestones/              List (views + filters), new, [id] detail with linked tasks, [id]/edit, actions.ts
+      raid/                    Placeholder for the next module
   components/
     layout/                    Sidebar (desktop + mobile drawer), page header, placeholder
     ui/                        Card, Badge, Button, FormField, ProgressBar, EmptyState, Skeleton
@@ -79,6 +80,7 @@ src/
     tasks/                     Task form, detail view, table, filters, delete button
   lib/
     tasks/                     Task rules (dependencies, cycles, blocked, completion) and list views
+    milestones/                Milestone rules (progress, calculated status, write checks) and list views
     types.ts                   Domain model (Project, Task, Milestone, RaidItem, ProjectUpdate)
     data/                      Repository interface, local file store, demo seed data
     services/                  Use-cases (writes + activity log), called by server actions
@@ -108,9 +110,10 @@ supabase/schema.sql            Draft Postgres schema with RLS
 | Overdue task | Status ≠ `done` and due date is before today (unchanged; on-hold tasks still count) |
 | Blocked task | Status is `blocked`, **or** status is not `done`/`on_hold`, the start date has arrived, and a predecessor is not done |
 | Due soon | Not done and due between today and today + 7 days |
-| Upcoming milestone | Not completed, planned date between today and today + 30 days |
-| Past-due milestone | Not completed and planned date is before today |
-| Delayed milestone | Past due, **or** completed after its planned date |
+| Milestone progress | Completed linked tasks ÷ total linked tasks × 100; “No tasks linked” (not 0%) when none |
+| Milestone status | Calculated, never typed in. First match wins: **Completed** (actual date recorded and every linked task done) → **Delayed** (planned completion passed) → **At risk** (due within 14 days with open tasks, or a linked task is blocked) → **In progress** (a linked task is in progress, blocked or done) → **Not started** |
+| Upcoming milestone | Not completed, planned completion between today and today + 30 days |
+| Past-due milestone | Status Delayed: not completed and planned completion is before today (unchanged definition; “completed” is now calculated) |
 | Schedule elapsed | (today − start) ÷ (target end − start), clamped to 0–100% |
 | Budget used | Actual spend ÷ budget (may exceed 100%) |
 
@@ -153,12 +156,32 @@ Rules, all enforced on the server inside the store's write lock (the form mirror
 
 Activity log entries: completed (with days early or late), reopened, marked blocked, completed via override, deleted.
 
+## Milestones module
+
+| Route | Purpose |
+| --- | --- |
+| `/milestones` | Views: All, Upcoming, Overdue, At risk, Completed. Filters: project, owner, status, planned-completion date range |
+| `/milestones/new` | Create a milestone (`?project=<id>` preselects the project and owner) |
+| `/milestones/[id]` | Status explanation, task-derived progress, linked tasks (open, unlink), link more tasks, Edit / Delete |
+| `/milestones/[id]/edit` | Edit; the calculated status is shown read-only |
+
+Status is calculated and cannot be set by hand, so it can never contradict the tasks. It is shown as a squared tag with a flag, distinct from the project's manual RAG health (round pill).
+
+Rules, enforced on the server:
+
+- **Project.** Must exist and not be archived. The project cannot change while tasks are linked.
+- **Completion.** The actual completion date can be recorded only when every linked task is done (a milestone with no tasks can be completed directly), and never in the future. Clearing it reopens the milestone.
+- **Consistency.** Reopening a linked task reopens a completed milestone automatically, with a log entry. Unfinished tasks cannot be added to a completed milestone, from the milestone page or the task form.
+- **Delete.** With tasks linked, you must choose to unlink them or move them to another milestone in the same project.
+
+Activity log entries: milestone created, planned dates changed, completed, reopened (manually or because a task reopened), deleted (with what happened to its tasks), tasks added to or removed from a milestone.
+
 ## Roadmap
 
 1. ~~**Projects module.**~~ Done (local store).
 2. ~~**Tasks module.**~~ Done (local store).
 3. **Supabase data source.** Apply `supabase/schema.sql`, add a seed script, implement the Supabase repository (with the task rules in a transaction or RPC), and add auth with workspace-scoped access rules.
-4. **Milestones module.** Planned vs actual dates, delayed detection.
+4. ~~**Milestones module.**~~ Done (local store).
 5. **RAID module.** Full RAID log with severity/probability/impact and mitigation tracking.
 6. **AI features.** For example status-report drafting and RAID suggestions, server-side via the Anthropic API.
 

@@ -37,7 +37,7 @@ describe("FileRepository", () => {
     const data = await repo().getPortfolio();
     expect(data.projects.length).toBe(8);
     const stored = JSON.parse(await readFile(file, "utf8"));
-    expect(stored.version).toBe(2);
+    expect(stored.version).toBe(3);
     expect(stored.seededOn).toBe(SEED_DATE);
   });
 

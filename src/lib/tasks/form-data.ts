@@ -10,7 +10,7 @@ export function taskFormOptions(data: PortfolioData) {
     milestones: data.milestones
       .filter((m) => liveIds.has(m.projectId))
       .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate))
-      .map((m) => ({ id: m.id, projectId: m.projectId, name: m.name })),
+      .map((m) => ({ id: m.id, projectId: m.projectId, name: m.name, completed: m.actualDate !== null })),
     tasks: tasks
       .map((t) => ({ id: t.id, projectId: t.projectId, title: t.title, status: t.status, dependsOn: t.dependsOn }))
       .sort((a, b) => a.title.localeCompare(b.title)),

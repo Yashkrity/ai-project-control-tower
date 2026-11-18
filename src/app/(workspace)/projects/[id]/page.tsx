@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getRepository, getToday } from "@/lib/data";
 import { summarizeProject } from "@/lib/metrics/portfolio";
 import { applyTaskFilters, buildTaskRows } from "@/lib/tasks/views";
+import { buildMilestoneRows } from "@/lib/milestones/views";
 import { ProjectDetail } from "@/components/projects/project-detail";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -16,9 +17,9 @@ async function ProjectContent({ params }: { params: PageProps<"/projects/[id]">[
   const project = data.projects.find((p) => p.id === id);
   if (!project) notFound();
 
-  const milestones = data.milestones
-    .filter((m) => m.projectId === id)
-    .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate));
+  const milestones = buildMilestoneRows(data, today, { includeArchived: true })
+    .filter((r) => r.milestone.projectId === id)
+    .sort((a, b) => a.milestone.plannedDate.localeCompare(b.milestone.plannedDate));
   const updates = data.updates
     .filter((u) => u.projectId === id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))

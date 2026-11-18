@@ -1,11 +1,22 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ISODate, PortfolioData, Project, ProjectInput, ProjectUpdate, Task } from "@/lib/types";
+import type { ISODate, Milestone, PortfolioData, Project, ProjectInput, ProjectUpdate, Task } from "@/lib/types";
 import { buildDemoData } from "./demo-data";
-import type { NewProjectUpdate, PortfolioRepository, TaskBuilder, TaskDeleteGuard } from "./repository";
+import type {
+  MilestoneBuilder,
+  MilestoneDeletePlan,
+  NewProjectUpdate,
+  PortfolioRepository,
+  TaskBuilder,
+  TaskDeleteGuard,
+  TaskLinkGuard,
+} from "./repository";
 
-const FILE_VERSION = 2;
+const FILE_VERSION = 3;
+
+type Loose = Record<string, unknown>;
+const str = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
 
 /**
  * v1 -> v2 (Tasks module):
@@ -13,18 +24,55 @@ const FILE_VERSION = 2;
  *  - tasks gain description, createdAt, updatedAt
  * Completion dates are kept as stored (v1 seeds set them to the due date).
  */
-export function migrateStore(raw: StoreFile): StoreFile {
-  if (raw.version === FILE_VERSION) return raw;
-  if (raw.version !== 1) throw new Error(`Unsupported data file version ${raw.version}`);
+function migrateV1toV2(raw: StoreFile): StoreFile {
   const stamp = `${raw.seededOn}T00:00:00.000Z`;
-  const tasks = (raw.data.tasks as unknown as Array<Record<string, unknown>>).map((t) => ({
+  const tasks = (raw.data.tasks as unknown as Loose[]).map((t) => ({
     ...t,
     status: t.status === "todo" ? "not_started" : t.status,
-    description: typeof t.description === "string" ? t.description : "",
-    createdAt: typeof t.createdAt === "string" ? t.createdAt : stamp,
-    updatedAt: typeof t.updatedAt === "string" ? t.updatedAt : stamp,
+    description: str(t.description, ""),
+    createdAt: str(t.createdAt, stamp),
+    updatedAt: str(t.updatedAt, stamp),
   })) as unknown as Task[];
-  return { ...raw, version: FILE_VERSION, data: { ...raw.data, tasks } };
+  return { ...raw, version: 2, data: { ...raw.data, tasks } };
+}
+
+/**
+ * v2 -> v3 (Milestones module):
+ *  - stored milestone `status` removed (status is now calculated)
+ *  - an actual date is kept only if the old status was "completed"
+ *  - milestones gain description, owner (defaults to the project manager),
+ *    priority ("medium"), plannedStartDate (earliest linked task start, else
+ *    the planned date), notes, createdAt, updatedAt
+ */
+function migrateV2toV3(raw: StoreFile): StoreFile {
+  const stamp = `${raw.seededOn}T00:00:00.000Z`;
+  const pm = new Map(raw.data.projects.map((p) => [p.id, p.projectManager]));
+  const milestones = (raw.data.milestones as unknown as Loose[]).map((m) => {
+    const { status, ...rest } = m;
+    const plannedDate = String(m.plannedDate);
+    const starts = raw.data.tasks.filter((t) => t.milestoneId === m.id).map((t) => t.startDate).sort();
+    return {
+      ...rest,
+      description: str(m.description, ""),
+      owner: str(m.owner, pm.get(String(m.projectId)) ?? "Unassigned"),
+      priority: str(m.priority, "medium"),
+      plannedStartDate: str(m.plannedStartDate, starts[0] && starts[0] < plannedDate ? starts[0] : plannedDate),
+      actualDate: status === "completed" && typeof m.actualDate === "string" ? m.actualDate : null,
+      notes: str(m.notes, ""),
+      createdAt: str(m.createdAt, stamp),
+      updatedAt: str(m.updatedAt, stamp),
+    };
+  }) as unknown as Milestone[];
+  return { ...raw, version: 3, data: { ...raw.data, milestones } };
+}
+
+/** Upgrades a store of any supported version to the current one, step by step. */
+export function migrateStore(raw: StoreFile): StoreFile {
+  let store = raw;
+  if (store.version === 1) store = migrateV1toV2(store);
+  if (store.version === 2) store = migrateV2toV3(store);
+  if (store.version !== FILE_VERSION) throw new Error(`Unsupported data file version ${raw.version}`);
+  return store;
 }
 
 interface StoreFile {
@@ -69,7 +117,7 @@ function assertValidStore(value: unknown, filePath: string): asserts value is St
   const d = v?.data as Partial<PortfolioData> | undefined;
   const ok =
     !!v &&
-    (v.version === 1 || v.version === FILE_VERSION) &&
+    typeof v.version === "number" && v.version >= 1 && v.version <= FILE_VERSION &&
     !!d &&
     ["projects", "tasks", "milestones", "raidItems", "updates"].every((k) =>
       Array.isArray((d as Record<string, unknown>)[k]),
@@ -214,6 +262,69 @@ export class FileRepository implements PortfolioRepository {
       guard(data, existing);
       data.tasks.splice(index, 1);
       return existing;
+    });
+  }
+
+  getMilestone(id: string): Promise<Milestone | null> {
+    return this.read((data) => data.milestones.find((m) => m.id === id) ?? null);
+  }
+
+  createMilestone(build: MilestoneBuilder): Promise<Milestone> {
+    return this.mutate((data) => {
+      const at = this.now().toISOString();
+      const milestone: Milestone = { ...build(data, null), id: randomUUID(), createdAt: at, updatedAt: at };
+      data.milestones.push(milestone);
+      return milestone;
+    });
+  }
+
+  updateMilestone(id: string, build: MilestoneBuilder): Promise<Milestone | null> {
+    return this.mutate((data) => {
+      const index = data.milestones.findIndex((m) => m.id === id);
+      if (index === -1) return null;
+      const existing = data.milestones[index];
+      const milestone: Milestone = {
+        ...build(data, existing),
+        id,
+        createdAt: existing.createdAt,
+        updatedAt: this.now().toISOString(),
+      };
+      data.milestones[index] = milestone;
+      return milestone;
+    });
+  }
+
+  deleteMilestone(id: string, plan: MilestoneDeletePlan) {
+    return this.mutate((data) => {
+      const index = data.milestones.findIndex((m) => m.id === id);
+      if (index === -1) return null;
+      const milestone = data.milestones[index];
+      const { reassignTo } = plan(data, milestone);
+      const at = this.now().toISOString();
+      const movedTasks: Task[] = [];
+      data.tasks.forEach((t, i) => {
+        if (t.milestoneId !== id) return;
+        data.tasks[i] = { ...t, milestoneId: reassignTo, updatedAt: at };
+        movedTasks.push(data.tasks[i]);
+      });
+      data.milestones.splice(index, 1);
+      return { milestone, movedTasks };
+    });
+  }
+
+  setTasksMilestone(taskIds: string[], milestoneId: string | null, guard: TaskLinkGuard): Promise<Task[]> {
+    return this.mutate((data) => {
+      const wanted = new Set(taskIds);
+      const targets = data.tasks.filter((t) => wanted.has(t.id));
+      guard(data, targets);
+      const at = this.now().toISOString();
+      const updated: Task[] = [];
+      data.tasks.forEach((t, i) => {
+        if (!wanted.has(t.id)) return;
+        data.tasks[i] = { ...t, milestoneId, updatedAt: at };
+        updated.push(data.tasks[i]);
+      });
+      return updated;
     });
   }
 

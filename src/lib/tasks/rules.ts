@@ -180,6 +180,10 @@ export function resolveTaskWrite(
     const milestone = data.milestones.find((m) => m.id === input.milestoneId);
     if (!milestone) add("milestoneId", "Choose a milestone that exists.");
     else if (milestone.projectId !== input.projectId) add("milestoneId", "The milestone belongs to a different project.");
+    else if (milestone.actualDate && input.status !== "done" && existing?.milestoneId !== milestone.id) {
+      // Linking unfinished work would silently undo a recorded completion.
+      add("milestoneId", `“${milestone.name}” is completed. Reopen it (clear its completion date) before adding unfinished work.`);
+    }
   }
 
   // Dependencies

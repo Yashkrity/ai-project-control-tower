@@ -1,4 +1,13 @@
-import type { PortfolioData, Project, ProjectInput, ProjectUpdate, Task, TaskDraft } from "@/lib/types";
+import type {
+  Milestone,
+  MilestoneDraft,
+  PortfolioData,
+  Project,
+  ProjectInput,
+  ProjectUpdate,
+  Task,
+  TaskDraft,
+} from "@/lib/types";
 
 export type NewProjectUpdate = Omit<ProjectUpdate, "id" | "createdAt">;
 
@@ -9,6 +18,18 @@ export type NewProjectUpdate = Omit<ProjectUpdate, "id" | "createdAt">;
  */
 export type TaskBuilder = (data: PortfolioData, existing: Task | null) => TaskDraft;
 export type TaskDeleteGuard = (data: PortfolioData, existing: Task) => void;
+
+export type MilestoneBuilder = (data: PortfolioData, existing: Milestone | null) => MilestoneDraft;
+
+/**
+ * Decides what happens to tasks linked to a milestone being deleted. Runs in
+ * the write lock; throw to refuse. Returns the milestone to move them to, or
+ * null to unlink them (they stay in the project without a milestone).
+ */
+export type MilestoneDeletePlan = (data: PortfolioData, existing: Milestone) => { reassignTo: string | null };
+
+/** Validates a bulk link/unlink in the write lock; throw to refuse. */
+export type TaskLinkGuard = (data: PortfolioData, tasks: Task[]) => void;
 
 /**
  * The only way pages, services and actions touch data. Implementations:
@@ -34,4 +55,12 @@ export interface PortfolioRepository {
   updateTask(id: string, build: TaskBuilder): Promise<Task | null>;
   /** Returns the deleted task, or null if it did not exist. */
   deleteTask(id: string, guard: TaskDeleteGuard): Promise<Task | null>;
+
+  getMilestone(id: string): Promise<Milestone | null>;
+  createMilestone(build: MilestoneBuilder): Promise<Milestone>;
+  updateMilestone(id: string, build: MilestoneBuilder): Promise<Milestone | null>;
+  /** Deletes the milestone and moves or unlinks its tasks in one write. */
+  deleteMilestone(id: string, plan: MilestoneDeletePlan): Promise<{ milestone: Milestone; movedTasks: Task[] } | null>;
+  /** Sets milestoneId on several tasks in one write. Returns the updated tasks. */
+  setTasksMilestone(taskIds: string[], milestoneId: string | null, guard: TaskLinkGuard): Promise<Task[]>;
 }

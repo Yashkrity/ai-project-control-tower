@@ -26,16 +26,27 @@ create table if not exists public.projects (
   constraint projects_dates_valid check (target_end_date >= start_date)
 );
 
+-- Milestone status (not started / in progress / at risk / delayed / completed)
+-- is calculated from linked tasks and dates, so it is not stored. See
+-- src/lib/milestones/rules.ts.
 create table if not exists public.milestones (
-  id            uuid primary key default gen_random_uuid(),
-  project_id    uuid not null references public.projects(id) on delete cascade,
-  name          text not null,
-  planned_date  date not null,
-  actual_date   date,
-  status        text not null default 'not_started'
-                check (status in ('not_started','in_progress','completed')),
-  created_at    timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  project_id          uuid not null references public.projects(id) on delete cascade,
+  name                text not null,
+  description         text not null default '',
+  owner               text not null,
+  priority            text not null default 'medium' check (priority in ('low','medium','high','critical')),
+  planned_start_date  date not null,
+  planned_date        date not null,             -- planned completion
+  actual_date         date,                      -- only while every linked task is done
+  notes               text not null default '',
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now(),
+  constraint milestones_dates_valid check (planned_date >= planned_start_date)
 );
+-- Not yet enforced in SQL (the app enforces it): actual_date may only be set
+-- while every task linked to the milestone is done, and is cleared when one
+-- is reopened. Implement with a trigger or RPC alongside the Supabase source.
 
 create table if not exists public.tasks (
   id              uuid primary key default gen_random_uuid(),

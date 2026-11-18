@@ -15,8 +15,9 @@ import type {
   RaidItem,
   Task,
 } from "@/lib/types";
-import { addDays, daysBetween } from "@/lib/utils/dates";
+import { daysBetween } from "@/lib/utils/dates";
 import { indexTasks, taskBlockInfo } from "@/lib/tasks/rules";
+import { isUpcoming, milestoneState, milestoneStates, type MilestoneState } from "@/lib/milestones/rules";
 
 /* ------------------------------------------------------------------ */
 /* Rules                                                               */
@@ -36,20 +37,12 @@ export function isTaskOverdue(task: Task, today: ISODate): boolean {
   return task.status !== "done" && task.dueDate < today;
 }
 
-/**
- * Delayed = still open past its planned date, or completed later than planned.
+/*
+ * Milestone status (completed / delayed / at risk / ...) is calculated in
+ * src/lib/milestones/rules.ts from linked tasks and dates. "Past due" on the
+ * dashboard is exactly the Delayed status: not completed and the planned
+ * completion date has passed.
  */
-export function isMilestoneDelayed(milestone: Milestone, today: ISODate): boolean {
-  if (milestone.status === "completed") {
-    return milestone.actualDate !== null && milestone.actualDate > milestone.plannedDate;
-  }
-  return isMilestonePastDue(milestone, today);
-}
-
-/** Past due = still open and its planned date is before today (actionable now). */
-export function isMilestonePastDue(milestone: Milestone, today: ISODate): boolean {
-  return milestone.status !== "completed" && milestone.plannedDate < today;
-}
 
 export interface Completion {
   completed: number;
@@ -94,7 +87,7 @@ export interface ProjectSummary {
   overdueTasks: number;
   /** Status Blocked, or underway but waiting on incomplete predecessors. */
   blockedTasks: number;
-  delayedMilestones: number;
+  milestones: { total: number; completed: number; delayed: number; atRisk: number };
   openRisks: number;
   openIssues: number;
   scheduleElapsed: number;
@@ -109,6 +102,7 @@ export interface OverdueTaskRow {
 
 export interface MilestoneRow {
   milestone: Milestone;
+  state: MilestoneState;
   projectName: string;
   daysUntil: number;
 }
@@ -129,9 +123,9 @@ export interface PortfolioSummary {
   blockedTaskCount: number;
   upcomingMilestones: MilestoneRow[];
   /** Open milestones past their planned date. */
+  /** Milestones with calculated status Delayed (not completed, planned date passed). */
   pastDueMilestoneCount: number;
-  /** Past due + completed late (includes historical slippage). */
-  delayedMilestoneCount: number;
+  atRiskMilestoneCount: number;
   totalBudget: number;
   totalSpend: number;
   projects: ProjectSummary[];
@@ -155,14 +149,20 @@ export function summarizeProject(
   const pTasks = data.tasks.filter((t) => t.projectId === project.id);
   const pRaid = data.raidItems.filter((r) => r.projectId === project.id && isOpenRaid(r));
   const byId = indexTasks(pTasks); // dependencies are always within one project
+  const states = data.milestones
+    .filter((m) => m.projectId === project.id)
+    .map((m) => milestoneState(m, pTasks, today).status);
   return {
     project,
     progress: taskCompletion(pTasks),
     overdueTasks: pTasks.filter((t) => isTaskOverdue(t, today)).length,
     blockedTasks: pTasks.filter((t) => taskBlockInfo(t, byId, today).blocked).length,
-    delayedMilestones: data.milestones.filter(
-      (m) => m.projectId === project.id && isMilestoneDelayed(m, today),
-    ).length,
+    milestones: {
+      total: states.length,
+      completed: states.filter((s) => s === "completed").length,
+      delayed: states.filter((s) => s === "delayed").length,
+      atRisk: states.filter((s) => s === "at_risk").length,
+    },
     openRisks: pRaid.filter((r) => r.type === "risk").length,
     openIssues: pRaid.filter((r) => r.type === "issue").length,
     scheduleElapsed: scheduleElapsedPercent(project, today),
@@ -210,15 +210,17 @@ export function buildPortfolioSummary(
         PRIORITY_RANK[a.task.priority] - PRIORITY_RANK[b.task.priority],
     );
 
-  const horizon = addDays(today, milestoneHorizonDays);
+  const states = milestoneStates({ milestones, tasks }, today);
   const upcomingMilestones: MilestoneRow[] = milestones
-    .filter((m) => m.status !== "completed" && m.plannedDate >= today && m.plannedDate <= horizon)
+    .filter((m) => isUpcoming(m, states.get(m.id)!, today, milestoneHorizonDays))
     .map((milestone) => ({
       milestone,
+      state: states.get(milestone.id)!,
       projectName: nameOf.get(milestone.projectId) ?? "Unknown project",
       daysUntil: daysBetween(today, milestone.plannedDate),
     }))
     .sort((a, b) => a.daysUntil - b.daysUntil);
+  const countStatus = (status: string) => [...states.values()].filter((s) => s.status === status).length;
 
   const projectSummaries = projects.map((project) =>
     summarizeProject(project, { tasks, milestones, raidItems: data.raidItems }, today),
@@ -240,8 +242,8 @@ export function buildPortfolioSummary(
     overdueTasks,
     blockedTaskCount: projectSummaries.reduce((sum, p) => sum + p.blockedTasks, 0),
     upcomingMilestones,
-    pastDueMilestoneCount: milestones.filter((m) => isMilestonePastDue(m, today)).length,
-    delayedMilestoneCount: milestones.filter((m) => isMilestoneDelayed(m, today)).length,
+    pastDueMilestoneCount: countStatus("delayed"),
+    atRiskMilestoneCount: countStatus("at_risk"),
     totalBudget: active.reduce((sum, p) => sum + p.budget, 0),
     totalSpend: active.reduce((sum, p) => sum + p.actualSpend, 0),
     projects: projectSummaries,
